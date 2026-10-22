@@ -51,17 +51,29 @@ cd mcp-server && uv sync && uv run pytest && cd ..
 open app-mac/build/KimBiseo.app
 ```
 
-### 규칙 (선택)
+### 규칙과 기억
 
-김비서는 질문할 때마다 규칙 md 를 함께 읽는다. 뒤에 오는 규칙이 앞의 규칙보다 우선한다.
+김비서 폴더(`~/Library/Application Support/kim-biseo/`)에서 Claude Code 처럼 md 로 관리한다. 처음 실행하면 `shared/templates/` 의 예시가 복사된다.
 
-| 위치 | Git | 내용 |
-|---|---|---|
-| `shared/rules/*.md` | 올라감 | 누구에게나 맞는 공통 규칙 (예: `jira.md`) |
-| `shared/rules/*.local.md` | 안 올라감 | 팀·회사 규칙. `jira.example.md` 를 `jira.local.md` 로 복사해서 고친다 |
-| `~/Library/Application Support/kim-biseo/rules/*.md` | 안 올라감 | 내 규칙. 채팅에서 "앞으로 ~해줘" 하고 [규칙에 저장]을 누르면 여기에 쌓인다 |
+```
+kim-biseo/
+ ├ CLAUDE.md        전체 지시 (Claude Code 가 직접 읽음)
+ └ rules/
+    ├ jira.md       Jira 규칙과 우리 팀 기본값 (프로젝트 키, 기간, worklog 고정 이슈 …)
+    └ memory.md     기억 (채팅에서 "기억해" → [기억하기])
+```
 
-처음 실행하면 김비서가 주인 이름을 묻고 인사한다. 이름과 규칙 파일은 ⚙️ 설정에서 바꾸거나 열 수 있다.
+- ⚙️ 설정 → 「규칙」에서 파일을 열고, 지우고, 새로 만들 수 있다. 고친 내용은 다음 질문부터 바로 적용된다.
+- 채팅에서 "앞으로 지라 제목 앞에 [회의] 붙여줘" 처럼 말하고 [규칙에 저장]을 누르면 `rules/` 에 한 줄 추가된다.
+- `rules/jira.md` 의 「우리 팀 기본값」 예:
+  ```
+  - 프로젝트 키: MYPROJ
+  - 이슈 유형: 개발이면 Story, 일반 업무면 Task
+  - Original Estimate 365d, Target start 는 등록하는 날, Target end 는 그해 12월 31일
+  - worklog 를 남길 고정 이슈: 회의 → MYPROJ-100, 운영업무(CS) → MYPROJ-101
+  ```
+
+처음 실행하면 김비서가 주인 이름을 묻고 인사한다. 이름은 ⚙️ 설정에서 바꿀 수 있다.
 
 저장소를 `~/Workspace/kim-biseo` 가 아닌 곳에 두었다면 앱의 ⚙️ 설정에서 저장소 경로를 바꾼다.
 

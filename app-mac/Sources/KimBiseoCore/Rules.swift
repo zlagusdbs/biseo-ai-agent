@@ -1,64 +1,99 @@
 import Foundation
 
-/// 김비서 규칙 md. 질문할 때마다 시스템 안내 뒤에 붙인다. 뒤에 오는 규칙이 앞의 규칙보다 우선한다.
-///   1. 공통   shared/rules/*.md        (Git, 공개. *.example.md 는 예시라 읽지 않음)
-///   2. 팀     shared/rules/*.local.md  (Git 에 안 올라감. 회사 정보 가능)
-///   3. 나     데이터 폴더 rules/*.md   (이 Mac 에만. 채팅에서 [규칙에 저장] 한 것도 여기로)
+/// 김비서 규칙 md. 김비서 폴더(앱 데이터 폴더) 하나에서 Claude Code 처럼 관리한다.
+///   CLAUDE.md      전체 지시. claude 를 김비서 폴더 아래(work/)에서 실행하므로 Claude Code 가 스스로 읽는다.
+///   rules/*.md     주제별 규칙 (jira.md, memory.md …). 질문할 때마다 앱이 시스템 안내 뒤에 붙인다.
+/// 처음 실행하면 저장소 shared/templates/ 의 예시를 복사해 준다.
 public enum Rules {
-    public enum Layer: String, CaseIterable {
-        case shared = "공통", team = "팀", mine = "나"
-    }
-
     public struct File: Identifiable, Equatable {
-        public let layer: Layer
         public let url: URL
         public var id: String { url.path }
-        public var name: String { url.lastPathComponent }
-    }
-
-    public static var myDir: URL { AppPaths.dataDir.appendingPathComponent("rules", isDirectory: true) }
-
-    public static func sharedDir(settings: AppSettings) -> URL {
-        URL(fileURLWithPath: settings.repoDir).appendingPathComponent("shared/rules", isDirectory: true)
-    }
-
-    public static func files(settings: AppSettings) -> [File] {
-        func md(_ dir: URL) -> [URL] {
-            ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [])
-                .filter { $0.pathExtension == "md" }
-                .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        public init(url: URL) { self.url = url }
+        /// 김비서 폴더 기준 경로. 예: CLAUDE.md, rules/jira.md
+        public var name: String {
+            url.deletingLastPathComponent().lastPathComponent == "rules" ? "rules/\(url.lastPathComponent)" : url.lastPathComponent
         }
-        let repo = md(sharedDir(settings: settings))
-        let shared = repo.filter { !$0.lastPathComponent.hasSuffix(".local.md") && !$0.lastPathComponent.hasSuffix(".example.md") }
-        let team = repo.filter { $0.lastPathComponent.hasSuffix(".local.md") }
-        return shared.map { File(layer: .shared, url: $0) } + team.map { File(layer: .team, url: $0) }
-            + md(myDir).map { File(layer: .mine, url: $0) }
     }
 
-    /// 시스템 안내에 붙일 글. 규칙이 없으면 빈 문자열.
-    public static func prompt(settings: AppSettings) -> String {
-        let parts = files(settings: settings).compactMap { file -> String? in
+    public static var homeDir: URL { AppPaths.dataDir }
+    public static var claudeMd: URL { homeDir.appendingPathComponent("CLAUDE.md") }
+    public static var myDir: URL { homeDir.appendingPathComponent("rules", isDirectory: true) }
+
+    public static func templatesDir(settings: AppSettings) -> URL {
+        URL(fileURLWithPath: settings.repoDir).appendingPathComponent("shared/templates", isDirectory: true)
+    }
+
+    /// CLAUDE.md (있으면) + rules/*.md 이름순
+    public static func files() -> [File] {
+        let rules = ((try? FileManager.default.contentsOfDirectory(at: myDir, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension == "md" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        let top = FileManager.default.fileExists(atPath: claudeMd.path) ? [claudeMd] : []
+        return (top + rules).map { File(url: $0) }
+    }
+
+    /// 시스템 안내에 붙일 rules/*.md. CLAUDE.md 는 Claude Code 가 읽으므로 넣지 않는다. 규칙이 없으면 빈 문자열.
+    public static func prompt() -> String {
+        let parts = files().filter { $0.url != claudeMd }.compactMap { file -> String? in
             guard let text = try? String(contentsOf: file.url, encoding: .utf8),
                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-            return "## [\(file.layer.rawValue)] \(file.name)\n\(text.trimmingCharacters(in: .whitespacesAndNewlines))"
+            return "## \(file.name)\n\(text.trimmingCharacters(in: .whitespacesAndNewlines))"
         }
         guard !parts.isEmpty else { return "" }
-        return "\n\n# 사용자 규칙 (공통 → 팀 → 나 순서. 서로 다르면 뒤에 있는 규칙을 따른다)\n\n" + parts.joined(separator: "\n\n") + "\n"
+        return "\n\n# 사용자 규칙 (김비서 폴더의 rules/*.md)\n\n" + parts.joined(separator: "\n\n") + "\n"
     }
 
-    /// 내 규칙 파일에 한 줄 추가. 파일 이름은 영문·숫자·한글·-·_ 만 남긴다 (비면 memory).
+    /// 처음 실행할 때 템플릿을 복사한다. 이미 있는 파일은 건드리지 않는다. 복사한 파일 수.
+    @discardableResult
+    public static func installTemplates(settings: AppSettings) -> Int {
+        let source = templatesDir(settings: settings)
+        let fm = FileManager.default
+        var copied = 0
+        try? fm.createDirectory(at: myDir, withIntermediateDirectories: true)
+        var pairs = [(source.appendingPathComponent("CLAUDE.md"), claudeMd)]
+        for url in (try? fm.contentsOfDirectory(at: source.appendingPathComponent("rules"), includingPropertiesForKeys: nil)) ?? []
+        where url.pathExtension == "md" {
+            pairs.append((url, myDir.appendingPathComponent(url.lastPathComponent)))
+        }
+        for (from, to) in pairs where fm.fileExists(atPath: from.path) && !fm.fileExists(atPath: to.path) {
+            if (try? fm.copyItem(at: from, to: to)) != nil { copied += 1 }
+        }
+        return copied
+    }
+
+    /// 새 규칙 파일. 이름은 영문·숫자·한글·-·_ 만 남긴다. 이미 있으면 그 파일.
+    public static func create(_ name: String) throws -> URL {
+        let url = myDir.appendingPathComponent(safeName(name) + ".md")
+        try FileManager.default.createDirectory(at: myDir, withIntermediateDirectories: true)
+        if !FileManager.default.fileExists(atPath: url.path) {
+            try "# \(safeName(name))\n\n- \n".write(to: url, atomically: true, encoding: .utf8)
+        }
+        return url
+    }
+
+    public static func delete(_ file: File) throws {
+        try FileManager.default.removeItem(at: file.url)
+    }
+
+    /// 내 규칙 파일에 한 줄 추가 (없으면 만든다).
     @discardableResult
     public static func append(_ text: String, to name: String) throws -> URL {
-        let safe = String(name.lowercased().unicodeScalars.filter {
-            CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_"
-        })
-        let url = myDir.appendingPathComponent((safe.isEmpty ? "memory" : safe) + ".md")
+        let safe = safeName(name)
+        let url = myDir.appendingPathComponent(safe + ".md")
         try FileManager.default.createDirectory(at: myDir, withIntermediateDirectories: true)
-        var body = (try? String(contentsOf: url, encoding: .utf8)) ?? "# \(safe.isEmpty ? "memory" : safe)\n\n"
+        var body = (try? String(contentsOf: url, encoding: .utf8)) ?? "# \(safe)\n\n"
         if !body.hasSuffix("\n") { body += "\n" }
         body += "- \(text.trimmingCharacters(in: .whitespacesAndNewlines))\n"
         try body.write(to: url, atomically: true, encoding: .utf8)
         return url
+    }
+
+    public static func safeName(_ name: String) -> String {
+        let base = name.lowercased().hasSuffix(".md") ? String(name.dropLast(3)) : name
+        let safe = String(base.lowercased().unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0) || $0 == "-" || $0 == "_"
+        })
+        return safe.isEmpty ? "memory" : safe
     }
 }
 

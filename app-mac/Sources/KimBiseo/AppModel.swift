@@ -83,6 +83,11 @@ final class AppModel: ObservableObject {
             }
         }
         AlarmStore.save(alarms)
+        // 처음 실행이면 저장소 예시로 CLAUDE.md 와 rules/ 를 만들어 준다 (한 번만, 지운 파일은 다시 만들지 않음)
+        if !UserDefaults.standard.bool(forKey: "installedRuleTemplates") {
+            UserDefaults.standard.set(true, forKey: "installedRuleTemplates")
+            Rules.installTemplates(settings: loaded)
+        }
     }
 
     /// 알림 추가·수정. 시각 알림 먼저, 트리거는 아래로 정렬한다.

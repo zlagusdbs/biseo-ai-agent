@@ -10,8 +10,7 @@ struct SettingsView: View {
             Section("이름") {
                 TextField("주인 이름", text: $model.settings.ownerName, prompt: Text("김비서가 부를 이름"))
             }
-            MemorySection()
-            RulesSection(settings: model.settings)
+            RulesSection()
             Section("단축키") {
                 HotkeyRecorder(hotkey: $model.settings.hotkey)
             }
@@ -135,95 +134,63 @@ private struct ClaudeAccountSection: View {
     }
 }
 
-/// 김비서 규칙 md 목록. 질문할 때마다 공통 → 팀 → 나 순서로 읽는다.
+
+/// 김비서 폴더의 CLAUDE.md 와 rules/*.md. 열기·삭제, 새 규칙 만들기.
 private struct RulesSection: View {
-    let settings: AppSettings
     @State private var files: [Rules.File] = []
+    @State private var deleting: Rules.File?
+    @State private var naming = false
+    @State private var newName = ""
 
     var body: some View {
         Section {
             if files.isEmpty {
-                Text("규칙 파일이 없어요.").foregroundStyle(.secondary)
+                Text("규칙 파일이 없어요. [새 규칙]으로 만들어 보세요.").foregroundStyle(.secondary)
             }
             ForEach(files) { file in
                 HStack {
-                    Text(file.layer.rawValue).font(.caption.weight(.medium))
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Color.accentColor.opacity(0.12), in: Capsule())
-                    Text(file.name)
+                    Image(systemName: "doc.text").foregroundStyle(.secondary)
+                    Text(file.name).font(.body.monospaced())
                     Spacer()
                     Button("열기") { NSWorkspace.shared.open(file.url) }
+                    Button(role: .destructive) { deleting = file } label: { Image(systemName: "trash") }
+                        .buttonStyle(.borderless).help("삭제")
                 }
             }
             HStack {
-                Button("새 내 규칙") {
-                    if let url = try? Rules.append("여기에 규칙을 한 줄씩 적어요", to: "my-rules") {
-                        NSWorkspace.shared.open(url)
-                        reload()
-                    }
-                }
-                Button("내 규칙 폴더") {
+                Button("새 규칙") { newName = ""; naming = true }
+                Button("폴더 열기") {
                     try? FileManager.default.createDirectory(at: Rules.myDir, withIntermediateDirectories: true)
-                    NSWorkspace.shared.open(Rules.myDir)
+                    NSWorkspace.shared.open(Rules.homeDir)
                 }
-                Button("팀 규칙 폴더") { NSWorkspace.shared.open(Rules.sharedDir(settings: settings)) }
                 Spacer()
-                Button { reload() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless)
+                Button { reload() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless).help("새로고침")
             }
         } header: {
             Text("규칙")
         } footer: {
-            Text("공통(저장소, 공개) → 팀(*.local.md, Git 에 안 올라감) → 나(이 Mac) 순서로 읽고, 서로 다르면 뒤의 규칙을 따라요. 고친 내용은 다음 질문부터 바로 적용돼요.")
+            Text("CLAUDE.md 는 전체 지시, rules/ 는 주제별 규칙이에요 (기억은 rules/memory.md). 고친 내용은 다음 질문부터 바로 적용돼요.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .task { reload() }
-    }
-
-    private func reload() { files = Rules.files(settings: settings) }
-}
-
-/// 김비서 기억 (memory.md). 채팅에서 "기억해" 하고 [기억하기]를 누르면 쌓이고, 여기서 지울 수 있다.
-private struct MemorySection: View {
-    @State private var items: [String] = []
-    @State private var draft = ""
-
-    var body: some View {
-        Section {
-            if items.isEmpty {
-                Text("아직 기억한 게 없어요. 채팅에서 \"내 팀은 가격팀이야, 기억해\" 처럼 말해 보세요.")
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(items, id: \.self) { item in
-                HStack {
-                    Text(item)
-                    Spacer()
-                    Button(role: .destructive) {
-                        try? Memory.forget(item)
-                        reload()
-                    } label: { Image(systemName: "trash") }
-                        .buttonStyle(.borderless).help("잊기")
-                }
-            }
-            HStack {
-                TextField("", text: $draft, prompt: Text("직접 추가. 예: 매주 화요일 10시 팀 회의"))
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit(add)
-                Button("추가", action: add).disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-        } header: {
-            Text("기억")
-        } footer: {
-            Text("이 Mac 의 memory.md 에 저장돼요. 새 대화를 시작해도 김비서가 알고 있어요.")
-                .font(.caption).foregroundStyle(.secondary)
+        .alert("규칙 파일을 삭제할까요?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+               presenting: deleting) { file in
+            Button("삭제", role: .destructive) { try? Rules.delete(file); reload() }
+            Button("취소", role: .cancel) {}
+        } message: { file in
+            Text("\(file.name) 을(를) 지워요. 되돌릴 수 없어요.")
         }
-        .task { reload() }
+        .alert("새 규칙", isPresented: $naming) {
+            TextField("파일 이름. 예: wiki", text: $newName)
+            Button("만들기") {
+                if let url = try? Rules.create(newName) { NSWorkspace.shared.open(url); reload() }
+            }
+            .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("rules/ 폴더에 md 파일을 만들고 열어요.")
+        }
     }
 
-    private func add() {
-        try? Memory.add(draft)
-        draft = ""
-        reload()
-    }
-
-    private func reload() { items = Memory.items() }
+    private func reload() { files = Rules.files() }
 }
