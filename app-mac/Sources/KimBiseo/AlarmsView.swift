@@ -36,6 +36,21 @@ struct AlarmsView: View {
                 } label: { Label("추가", systemImage: "plus") }
             }
             .padding(12)
+            HStack(spacing: 14) {
+                Text("받을 곳").font(.caption).foregroundStyle(.secondary)
+                Toggle("Mac 알림", isOn: $model.settings.notifyMac)
+                    .help("화면 오른쪽 위에 잠깐 떴다가 알림 센터에 쌓이는 macOS 알림")
+                Toggle("미리 알림 창", isOn: $model.settings.notifyPanel)
+                    .help("화면 오른쪽 아래에 [확인]을 누를 때까지 남아 있는 김비서 카드")
+                if !model.settings.notifyMac && !model.settings.notifyPanel {
+                    Label("둘 다 끄면 알림이 오지 않아요", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.orange)
+                }
+                Spacer()
+            }
+            .toggleStyle(.checkbox)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 10)
             Divider()
 
             if model.alarms.isEmpty && model.alarmGroups.isEmpty {

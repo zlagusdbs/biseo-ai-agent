@@ -278,7 +278,9 @@ do {
     check(RuleProposal.extract(from: RuleProposal.hint).notes.count == 1, "rules: 안내 예시가 읽힘")
     check(RuleProposal.looksLikeRequest("앞으로 지라 제목 앞에 [회의] 붙여줘") && !RuleProposal.looksLikeRequest("내 미완료 Jira"), "rules: 요청 판단")
     let old = #"{"repoDir":"/r","claudePath":"/c","uvPath":"/u","reportHour":10,"reportMinute":0}"#
-    check((try? JSONDecoder().decode(AppSettings.self, from: Data(old.utf8)))?.ownerName == "", "rules: 예전 설정은 주인 이름 없음 (처음 인사)")
+    let oldSettings = try? JSONDecoder().decode(AppSettings.self, from: Data(old.utf8))
+    check(oldSettings?.ownerName == "", "rules: 예전 설정은 주인 이름 없음 (처음 인사)")
+    check(oldSettings?.notifyMac == true && oldSettings?.notifyPanel == true, "settings: 예전 설정은 알림 둘 다 켜짐")
     try? FileManager.default.removeItem(at: base)
 }
 
