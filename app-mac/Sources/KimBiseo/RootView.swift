@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 왼쪽은 선택한 메뉴 내용, 오른쪽은 세로 메뉴(채팅·연결·설정).
+/// 왼쪽은 선택한 메뉴 내용, 오른쪽은 세로 메뉴(채팅·알림·연결·설정).
 struct RootView: View {
     @ObservedObject var model: AppModel
 

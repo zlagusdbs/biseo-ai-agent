@@ -2,7 +2,7 @@ import Foundation
 import KimBiseoCore
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case chat, connections, alarms, settings
+    case chat, alarms, connections, settings
     var id: String { rawValue }
 
     var symbol: String {
