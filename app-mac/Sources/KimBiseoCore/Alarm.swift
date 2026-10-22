@@ -66,6 +66,13 @@ public struct Alarm: Identifiable, Codable, Equatable {
         return ReportSchedule.shouldRun(now: now, lastRunDay: lastRunDay, hour: hour, minute: minute, calendar: calendar)
     }
 
+    /// 새로 만들거나 시각을 바꾼 알림. 오늘 시각이 이미 지났으면 오늘은 건너뛰고 다음부터 울린다
+    /// (오후에 "매일 9시" 를 등록하자마자 울리지 않게).
+    public mutating func resetSchedule(now: Date, calendar: Calendar) {
+        let passed = (calendar.component(.hour, from: now), calendar.component(.minute, from: now)) >= (hour, minute)
+        lastRunDay = passed ? ReportSchedule.dayString(now, calendar: calendar) : nil
+    }
+
     public func appliesOn(_ date: Date, calendar: Calendar) -> Bool {
         let weekday = calendar.component(.weekday, from: date)
         switch repeatRule {

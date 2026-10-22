@@ -96,7 +96,8 @@ final class ChatSession: ObservableObject {
         switch response {
         case .success(let text, let newSession):
             if !newSession.isEmpty { sessionId = newSession }
-            append(ChatMessage(role: .assistant, text: text))
+            let (clean, alarms) = AlarmProposal.extract(from: text)
+            append(ChatMessage(role: .assistant, text: clean, alarms: alarms))
         case .failure(let failure):
             append(ChatMessage(role: .error, text: failure.message))
             lastFailedImages = images

@@ -43,7 +43,7 @@ struct AlarmsView: View {
                                 }
                                 Text(alarm.title.isEmpty ? "(제목 없음)" : alarm.title).font(.body.weight(.medium))
                                 Text(alarm.prompt == Alarm.dailyReportPrompt ? "내 미완료 Jira 를 정리해서 보고"
-                                     : alarm.prompt.isEmpty ? "생기면 바로 알림" : alarm.prompt)
+                                     : alarm.prompt.isEmpty ? (alarm.trigger == nil ? "시각에 알림만" : "생기면 바로 알림") : alarm.prompt)
                                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                                 if let last = alarm.lastRunDay {
                                     Text("마지막 실행 \(last)").font(.caption2).foregroundStyle(.tertiary)
@@ -66,17 +66,7 @@ struct AlarmsView: View {
         }
         .task { if model.systems.isEmpty { await model.refreshSystems() } }
         .sheet(item: $editing) { alarm in
-            AlarmEditor(alarm: alarm, systems: model.systems) { saved in
-                if let i = model.alarms.firstIndex(where: { $0.id == saved.id }) {
-                    model.alarms[i] = saved
-                } else {
-                    model.alarms.append(saved)
-                }
-                model.alarms.sort { a, b in
-                    if (a.trigger == nil) != (b.trigger == nil) { return a.trigger == nil }   // 시각 알림 먼저, 트리거는 아래
-                    return (a.hour, a.minute) < (b.hour, b.minute)
-                }
-            }
+            AlarmEditor(alarm: alarm, systems: model.systems) { model.save($0) }
         }
     }
 }
@@ -199,7 +189,7 @@ struct AlarmEditor: View {
                             Text("내용").font(.caption).foregroundStyle(.secondary)
                             TextField("", text: $alarm.prompt,
                                       prompt: Text(mode == .trigger ? "비워두면 알림만. 예: 이 PR 변경 내용 요약해줘"
-                                                                    : "김비서에게 시킬 내용. 예: 이번 주 내 근무일정 알려줘"),
+                                                                    : "비워두면 알림만. 예: 이번 주 내 근무일정 알려줘"),
                                       axis: .vertical)
                                 .textFieldStyle(.roundedBorder)
                                 .labelsHidden()
@@ -216,7 +206,6 @@ struct AlarmEditor: View {
                 Button("저장") { save() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(alarm.title.trimmingCharacters(in: .whitespaces).isEmpty
-                              || (mode == .time && alarm.prompt.trimmingCharacters(in: .whitespaces).isEmpty)
                               || (mode == .time && kind == .days && days.isEmpty))
             }
         }
@@ -258,8 +247,8 @@ struct AlarmEditor: View {
         case .days: alarm.repeatRule = .days(days.sorted())
         case .once: alarm.repeatRule = .once(ReportSchedule.dayString(onceDate, calendar: cal)); alarm.enabled = true
         }
-        // 시각이나 반복을 바꾸면 오늘 다시 울릴 수 있게 한다.
-        alarm.lastRunDay = nil
+        // 시각이나 반복을 바꾸면 기록을 새로 잡는다 (오늘 시각이 이미 지났으면 다음부터).
+        alarm.resetSchedule(now: Date(), calendar: cal)
         onSave(alarm)
         dismiss()
     }

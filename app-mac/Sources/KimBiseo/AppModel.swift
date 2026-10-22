@@ -61,6 +61,27 @@ final class AppModel: ObservableObject {
         AlarmStore.save(alarms)
     }
 
+    /// 알림 추가·수정. 시각 알림 먼저, 트리거는 아래로 정렬한다.
+    func save(_ alarm: Alarm) {
+        if let i = alarms.firstIndex(where: { $0.id == alarm.id }) {
+            alarms[i] = alarm
+        } else {
+            alarms.append(alarm)
+        }
+        alarms.sort { a, b in
+            if (a.trigger == nil) != (b.trigger == nil) { return a.trigger == nil }
+            return (a.hour, a.minute) < (b.hour, b.minute)
+        }
+    }
+
+    /// 채팅에서 제안된 알림을 등록한다. 이미 등록한 것은 건너뛴다.
+    func register(_ proposed: [Alarm]) {
+        for var alarm in proposed where !alarms.contains(where: { $0.id == alarm.id }) {
+            alarm.resetSchedule(now: Date(), calendar: .current)
+            save(alarm)
+        }
+    }
+
     func refreshSystems() async {
         microsoft365 = nil
         Task { microsoft365 = await ConnectorStatus.check(name: ConnectorStatus.microsoft365, settings: settings) }

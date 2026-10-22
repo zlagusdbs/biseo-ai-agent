@@ -160,6 +160,29 @@ do {
     check(TriggerEvent.events(for: "github").count == 3 && TriggerEvent.systems == ["github", "deploy", "jira"], "trigger: 이벤트 목록")
 }
 
+// MARK: AlarmProposal
+do {
+    let reply = "알림 3개를 준비했어요.\n\n```kimbiseo-alarm\n[{\"title\":\"1:1 요청\",\"hour\":9,\"minute\":0,\"repeat\":\"daily\",\"prompt\":\"\"},{\"title\":\"1:1 요청\",\"hour\":13,\"repeat\":\"weekdays\"},{\"title\":\"x\",\"hour\":25}]\n```"
+    let (text, alarms) = AlarmProposal.extract(from: reply)
+    check(text == "알림 3개를 준비했어요.", "proposal: 블록은 본문에서 뺌")
+    check(alarms.count == 2 && alarms[0].hour == 9 && alarms[0].repeatRule == .daily && alarms[1].minute == 0
+          && alarms[1].repeatRule == .weekdays && alarms[0].prompt.isEmpty, "proposal: 알림 읽기, 잘못된 시각은 버림")
+    check(AlarmProposal.extract(from: "그냥 답").alarms.isEmpty, "proposal: 블록 없으면 없음")
+    check(AlarmProposal.extract(from: "```kimbiseo-alarm\n깨진 json\n```").text.isEmpty, "proposal: 깨진 블록도 본문에서 뺌")
+    check(AlarmProposal.repeatRule("days:4,2,2") == .days([2, 4]) && AlarmProposal.repeatRule("once:2026-10-23") == .once("2026-10-23")
+          && AlarmProposal.repeatRule("days:9") == nil && AlarmProposal.repeatRule("hourly") == nil, "proposal: 반복 규칙")
+    let msg = ChatMessage(role: .assistant, text: "t", alarms: alarms)
+    let back = (try? JSONEncoder().encode(msg)).flatMap { try? JSONDecoder().decode(ChatMessage.self, from: $0) }
+    check(back?.alarms.map(\.id) == alarms.map(\.id), "proposal: 대화 기록에 저장 (같은 id 라 다시 등록 안 됨)")
+
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "Asia/Seoul")!
+    let afternoon = cal.date(from: DateComponents(year: 2026, month: 10, day: 22, hour: 14))!
+    var nine = alarms[0]; nine.resetSchedule(now: afternoon, calendar: cal)
+    check(!nine.shouldRun(now: afternoon, calendar: cal), "proposal: 오후에 등록한 9시 알림은 바로 울리지 않음")
+    var six = nine; six.hour = 18; six.resetSchedule(now: afternoon, calendar: cal)
+    check(six.lastRunDay == nil && six.shouldRun(now: cal.date(byAdding: .hour, value: 4, to: afternoon)!, calendar: cal), "proposal: 오늘 남은 18시는 울림")
+}
+
 // MARK: AppSettings
 do {
     let old = #"{"repoDir":"/r","claudePath":"/c","uvPath":"/u","reportHour":10,"reportMinute":0,"lastReportDay":"2026-10-21"}"#
