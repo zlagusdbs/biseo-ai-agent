@@ -302,6 +302,7 @@ private struct JiraDraftCard: View {
                     .background(Color.accentColor.opacity(0.12), in: Capsule())
             }
             Text(draft.summary).font(.body.weight(.semibold)).textSelection(.enabled)
+            Label("담당자 나 (연결된 Jira 계정)", systemImage: "person").font(.caption).foregroundStyle(.secondary)
             if !draft.periodText.isEmpty {
                 Label(draft.periodText, systemImage: "calendar").font(.caption).foregroundStyle(.secondary)
             }

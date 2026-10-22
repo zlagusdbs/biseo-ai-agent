@@ -230,6 +230,7 @@ do {
     check(JiraProposal.extract(from: "```kimbiseo-jira\n{\"issue\":{\"project\":\"P\"}}\n```").draft == nil, "jira: 제목·유형 없는 초안은 버림")
     let hintWith = JiraProposal.hint(defaults: d, now: now, calendar: cal)
     let hintFirst = JiraProposal.hint(defaults: nil, now: now, calendar: cal)
+    check(hintWith.contains("담당자(Assignee)") && hintFirst.contains("본인으로 자동"), "jira: 담당자는 본인 자동이라고 안내")
     check(hintWith.contains("프로젝트 PRICING") && hintWith.contains("2026-12-31") && !hintWith.contains("아직 없다"), "jira: 기본값 안내")
     check(hintFirst.contains("아직 없다") && hintFirst.contains("jira_projects"), "jira: 처음엔 물어보기")
     // 안내 속 예시 블록이 실제로 읽히는지 (Claude 가 그대로 따라 써도 카드가 뜸)
