@@ -171,6 +171,10 @@ do {
     check(AlarmProposal.extract(from: "```kimbiseo-alarm\n깨진 json\n```").text.isEmpty, "proposal: 깨진 블록도 본문에서 뺌")
     check(AlarmProposal.repeatRule("days:4,2,2") == .days([2, 4]) && AlarmProposal.repeatRule("once:2026-10-23") == .once("2026-10-23")
           && AlarmProposal.repeatRule("days:9") == nil && AlarmProposal.repeatRule("hourly") == nil, "proposal: 반복 규칙")
+    let loose = AlarmProposal.extract(from: "```kimbiseo-alarm\n[{\"time\":\"18:30\",\"repeat\":\"daily\",\"message\":\"m\"}]\n```").alarms
+    check(loose.count == 1 && loose[0].hour == 18 && loose[0].minute == 30 && loose[0].title == "m", "proposal: time·message 키도 받음")
+    check(AlarmProposal.looksLikeRequest("매일 9시에 잊지말라고 알림 기록해줘") && !AlarmProposal.looksLikeRequest("내 미완료 Jira"), "proposal: 알림 요청 판단")
+    check(AlarmProposal.extract(from: AlarmProposal.hint).alarms.count == 1, "proposal: 안내 속 예시 형식이 실제로 읽힘")
     let msg = ChatMessage(role: .assistant, text: "t", alarms: alarms)
     let back = (try? JSONEncoder().encode(msg)).flatMap { try? JSONDecoder().decode(ChatMessage.self, from: $0) }
     check(back?.alarms.map(\.id) == alarms.map(\.id), "proposal: 대화 기록에 저장 (같은 id 라 다시 등록 안 됨)")
