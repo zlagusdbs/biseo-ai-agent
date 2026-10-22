@@ -4,6 +4,22 @@ import SwiftUI
 struct AlarmsView: View {
     @ObservedObject var model: AppModel
     @State private var editing: Alarm?
+    /// 펼친 그룹. 앱을 다시 켜도 기억한다 (AppStorage 는 Set 을 못 담아서 줄바꿈으로 이은 문자열).
+    @AppStorage("alarmExpandedGroups") private var expandedGroups = ""
+    @AppStorage("alarmUngroupedCollapsed") private var ungroupedCollapsed = false
+    /// 삭제 확인
+    @State private var deletingAlarm: Alarm?
+    @State private var deletingGroup: String?
+    /// 그룹 만들기·이름 바꾸기 (nil 이면 새 그룹)
+    @State private var naming: GroupNaming?
+    @State private var groupName = ""
+    /// 끌고 있는 알림이 올라가 있는 그룹 ("" 은 그룹 없음)
+    @State private var dropTarget: String?
+
+    private struct GroupNaming: Identifiable {
+        let old: String?
+        var id: String { old ?? "" }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -11,63 +27,209 @@ struct AlarmsView: View {
                 Text("알림").font(.headline)
                 Spacer()
                 Button {
+                    groupName = ""
+                    naming = GroupNaming(old: nil)
+                } label: { Label("그룹", systemImage: "folder.badge.plus") }
+                    .help("새 그룹 만들기. 알림을 그룹으로 끌어다 놓으면 옮겨져요")
+                Button {
                     editing = Alarm(title: "", prompt: "", hour: 9, minute: 0, repeatRule: .weekdays)
                 } label: { Label("추가", systemImage: "plus") }
             }
             .padding(12)
             Divider()
 
-            if model.alarms.isEmpty {
+            if model.alarms.isEmpty && model.alarmGroups.isEmpty {
                 Text("등록된 알림이 없어요. [추가]로 만들어 보세요.")
                     .foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.top, 40)
                 Spacer()
             } else {
+                let split = AlarmGroup.make(model.alarms, groups: model.alarmGroups)
                 List {
-                    ForEach($model.alarms) { $alarm in
-                        HStack(alignment: .top, spacing: 10) {
-                            Toggle("", isOn: $alarm.enabled).labelsHidden().toggleStyle(.switch).controlSize(.small)
-                            VStack(alignment: .leading, spacing: 3) {
-                                if let trigger = alarm.trigger {
-                                    HStack(spacing: 6) {
-                                        Label("트리거", systemImage: "bolt.fill").font(.callout.weight(.medium))
-                                            .foregroundStyle(Color.orange)
-                                        TriggerHelpIcon()
-                                        Text("\(SystemNames.name(trigger.system)) · \(TriggerEvent.find(trigger.event)?.name ?? trigger.event)")
-                                            .foregroundStyle(.secondary).lineLimit(1)
-                                    }
-                                } else {
-                                    HStack {
-                                        Text(alarm.timeText).font(.title3.monospacedDigit())
-                                        Text(alarm.repeatRule.description).foregroundStyle(.secondary)
-                                    }
-                                }
-                                Text(alarm.title.isEmpty ? "(제목 없음)" : alarm.title).font(.body.weight(.medium))
-                                Text(alarm.prompt == Alarm.dailyReportPrompt ? "내 미완료 Jira 를 정리해서 보고"
-                                     : alarm.prompt.isEmpty ? (alarm.trigger == nil ? "시각에 알림만" : "생기면 바로 알림") : alarm.prompt)
-                                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                                if let last = alarm.lastRunDay {
-                                    Text("마지막 실행 \(last)").font(.caption2).foregroundStyle(.tertiary)
-                                }
-                            }
-                            Spacer()
-                            Button { model.runAlarmNow(alarm) } label: { Image(systemName: "play.fill") }
-                                .buttonStyle(.borderless).help(alarm.trigger == nil ? "지금 실행" : "지금 확인")
-                            Button { editing = alarm } label: { Image(systemName: "pencil") }
-                                .buttonStyle(.borderless).help("수정")
-                            Button(role: .destructive) {
-                                model.alarms.removeAll { $0.id == alarm.id }
-                            } label: { Image(systemName: "trash") }
-                                .buttonStyle(.borderless).help("삭제")
-                        }
-                        .padding(.vertical, 4)
+                    ForEach(split.groups) { group in
+                        groupView(group)
                     }
+                    ungroupedView(split.ungrouped)
                 }
             }
         }
         .task { if model.systems.isEmpty { await model.refreshSystems() } }
         .sheet(item: $editing) { alarm in
-            AlarmEditor(alarm: alarm, systems: model.systems) { model.save($0) }
+            AlarmEditor(alarm: alarm, systems: model.systems, groups: model.alarmGroups) { model.save($0) }
         }
+        .alert("알림을 삭제할까요?", isPresented: Binding(get: { deletingAlarm != nil }, set: { if !$0 { deletingAlarm = nil } }),
+               presenting: deletingAlarm) { alarm in
+            Button("삭제", role: .destructive) { model.alarms.removeAll { $0.id == alarm.id } }
+            Button("취소", role: .cancel) {}
+        } message: { alarm in
+            Text("\"\(alarm.title.isEmpty ? "(제목 없음)" : alarm.title)\" \(alarm.trigger == nil ? alarm.timeText + " " : "")알림을 지워요. 되돌릴 수 없어요.")
+        }
+        .alert("그룹을 삭제할까요?", isPresented: Binding(get: { deletingGroup != nil }, set: { if !$0 { deletingGroup = nil } }),
+               presenting: deletingGroup) { name in
+            Button("그룹 삭제", role: .destructive) { model.deleteGroup(name) }
+            Button("취소", role: .cancel) {}
+        } message: { name in
+            Text("\"\(name)\" 그룹만 지워요. 안에 있던 알림은 지우지 않고 \"그룹 없음\"으로 옮겨요.")
+        }
+        .alert(naming?.old == nil ? "새 그룹" : "그룹 이름 바꾸기",
+               isPresented: Binding(get: { naming != nil }, set: { if !$0 { naming = nil } }), presenting: naming) { target in
+            TextField("그룹 이름", text: $groupName)
+            Button("저장") {
+                if let old = target.old { model.renameGroup(old, to: groupName) } else { model.addGroup(groupName) }
+            }
+            .disabled(groupName.trimmingCharacters(in: .whitespaces).isEmpty)
+            Button("취소", role: .cancel) {}
+        }
+    }
+}
+
+extension AlarmsView {
+    /// 그룹 하나. 머리줄(누르면 펼치기·접기, 켜기·끄기는 그룹 전체)에 알림을 끌어다 놓으면 이 그룹으로 옮긴다.
+    @ViewBuilder
+    private func groupView(_ group: AlarmGroup) -> some View {
+        let expanded = contains(expandedGroups, group.name)
+        HStack(alignment: .top, spacing: 10) {
+            Toggle("", isOn: Binding(get: { group.anyEnabled }, set: { on in
+                for alarm in group.alarms { setEnabled(alarm.id, on) }
+            }))
+            .labelsHidden().toggleStyle(.switch).controlSize(.small)
+            .disabled(group.alarms.isEmpty)
+            Button { expandedGroups = toggled(expandedGroups, group.name) } label: {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: expanded ? "chevron.down" : "chevron.right").font(.caption.weight(.semibold))
+                        .frame(width: 10).padding(.top, 4)
+                    Image(systemName: "folder").foregroundStyle(Color.accentColor).padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(group.name).font(.body.weight(.semibold))
+                        Text(group.summary).font(.callout.monospacedDigit()).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                    Spacer()
+                    Text("\(group.alarms.count)개").font(.caption).foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(expanded ? "접기" : "펼쳐서 하나씩 보기")
+            Menu {
+                Button("이름 바꾸기") { groupName = group.name; naming = GroupNaming(old: group.name) }
+                Button("그룹 삭제", role: .destructive) { deletingGroup = group.name }
+            } label: { Image(systemName: "ellipsis.circle") }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        }
+        .padding(.vertical, 4)
+        .dropTarget(isOn: dropTarget == group.name)
+        .dropDestination(for: String.self) { ids, _ in drop(ids, into: group.name) } isTargeted: { on in
+            dropTarget = on ? group.name : (dropTarget == group.name ? nil : dropTarget)
+        }
+        if expanded {
+            ForEach(group.alarms) { alarm in
+                row(alarm).padding(.leading, 28)
+                    .dropDestination(for: String.self) { ids, _ in drop(ids, into: group.name) }
+            }
+        }
+    }
+
+    /// 그룹에 넣지 않은 알림. 머리줄에 끌어다 놓으면 그룹에서 뺀다.
+    @ViewBuilder
+    private func ungroupedView(_ alarms: [Alarm]) -> some View {
+        if !alarms.isEmpty || !model.alarmGroups.isEmpty {
+            Section {
+                if !ungroupedCollapsed {
+                    ForEach(alarms) { alarm in
+                        row(alarm).dropDestination(for: String.self) { ids, _ in drop(ids, into: nil) }
+                    }
+                }
+            } header: {
+                Button { ungroupedCollapsed.toggle() } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: ungroupedCollapsed ? "chevron.right" : "chevron.down").font(.caption.weight(.semibold))
+                            .frame(width: 10)
+                        Text("그룹 없음")
+                        Text("\(alarms.count)").foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.vertical, 2)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .dropTarget(isOn: dropTarget == "")
+                .dropDestination(for: String.self) { ids, _ in drop(ids, into: nil) } isTargeted: { on in
+                    dropTarget = on ? "" : (dropTarget == "" ? nil : dropTarget)
+                }
+            }
+        }
+    }
+
+    /// 알림 한 개. 끌어서 다른 그룹으로 옮길 수 있다.
+    private func row(_ alarm: Alarm) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Toggle("", isOn: Binding(get: { alarm.enabled }, set: { setEnabled(alarm.id, $0) }))
+                .labelsHidden().toggleStyle(.switch).controlSize(.small)
+            VStack(alignment: .leading, spacing: 3) {
+                if let trigger = alarm.trigger {
+                    HStack(spacing: 6) {
+                        Label("트리거", systemImage: "bolt.fill").font(.callout.weight(.medium))
+                            .foregroundStyle(Color.orange)
+                        TriggerHelpIcon()
+                        Text("\(SystemNames.name(trigger.system)) · \(TriggerEvent.find(trigger.event)?.name ?? trigger.event)")
+                            .foregroundStyle(.secondary).lineLimit(1)
+                    }
+                } else {
+                    HStack {
+                        Text(alarm.timeText).font(.title3.monospacedDigit())
+                        Text(alarm.repeatRule.description).foregroundStyle(.secondary)
+                    }
+                }
+                Text(alarm.title.isEmpty ? "(제목 없음)" : alarm.title).font(.body.weight(.medium))
+                Text(alarm.prompt == Alarm.dailyReportPrompt ? "내 미완료 Jira 를 정리해서 보고"
+                     : alarm.prompt.isEmpty ? (alarm.trigger == nil ? "시각에 알림만" : "생기면 바로 알림") : alarm.prompt)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                if let last = alarm.lastRunDay {
+                    Text("마지막 실행 \(last)").font(.caption2).foregroundStyle(.tertiary)
+                }
+            }
+            Spacer()
+            Button { model.runAlarmNow(alarm) } label: { Image(systemName: "play.fill") }
+                .buttonStyle(.borderless).help(alarm.trigger == nil ? "지금 실행" : "지금 확인")
+            Button { editing = alarm } label: { Image(systemName: "pencil") }
+                .buttonStyle(.borderless).help("수정")
+            Button(role: .destructive) { deletingAlarm = alarm } label: { Image(systemName: "trash") }
+                .buttonStyle(.borderless).help("삭제")
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .draggable(alarm.id.uuidString) {
+            Label(alarm.title.isEmpty ? "(제목 없음)" : alarm.title, systemImage: "bell")
+                .padding(6).background(.background, in: RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    private func drop(_ ids: [String], into group: String?) -> Bool {
+        let uuids = ids.compactMap(UUID.init(uuidString:))
+        for id in uuids { model.move(alarmID: id, to: group) }
+        dropTarget = nil
+        return !uuids.isEmpty
+    }
+
+    private func setEnabled(_ id: UUID, _ on: Bool) {
+        if let i = model.alarms.firstIndex(where: { $0.id == id }) { model.alarms[i].enabled = on }
+    }
+
+    private func contains(_ stored: String, _ key: String) -> Bool {
+        stored.split(separator: "\n").contains { $0 == key }
+    }
+
+    private func toggled(_ stored: String, _ key: String) -> String {
+        var keys = stored.split(separator: "\n").map(String.init)
+        if let i = keys.firstIndex(of: key) { keys.remove(at: i) } else { keys.append(key) }
+        return keys.joined(separator: "\n")
+    }
+}
+
+private extension View {
+    /// 끌어다 놓을 곳 위에 올라가 있으면 파란 테두리로 표시한다.
+    func dropTarget(isOn: Bool) -> some View {
+        background(RoundedRectangle(cornerRadius: 6).fill(isOn ? Color.accentColor.opacity(0.12) : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(isOn ? Color.accentColor : .clear, lineWidth: 1.5))
     }
 }
 
@@ -93,10 +255,12 @@ struct AlarmEditor: View {
     @State private var kind: RepeatKind
     @State private var days: Set<Int>
     @State private var onceDate: Date
+    let groups: [String]
     let onSave: (Alarm) -> Void
 
-    init(alarm: Alarm, systems: [SystemStatus], onSave: @escaping (Alarm) -> Void) {
+    init(alarm: Alarm, systems: [SystemStatus], groups: [String] = [], onSave: @escaping (Alarm) -> Void) {
         self.onSave = onSave
+        self.groups = groups
         self.systems = systems
         _alarm = State(initialValue: alarm)
         _mode = State(initialValue: alarm.trigger == nil ? .time : .trigger)
@@ -175,6 +339,12 @@ struct AlarmEditor: View {
                 }
                 }
                 Section("무엇을") {
+                    if !groups.isEmpty {
+                        Picker("그룹", selection: $alarm.group) {
+                            Text("그룹 없음").tag(String?.none)
+                            ForEach(groups, id: \.self) { Text($0).tag(String?.some($0)) }
+                        }
+                    }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("제목").font(.caption).foregroundStyle(.secondary)
                         TextField("", text: $alarm.title, prompt: Text("알림에 보일 이름. 예: 근무일정 확인"))

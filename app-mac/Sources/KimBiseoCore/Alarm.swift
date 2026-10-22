@@ -33,10 +33,14 @@ public struct Alarm: Identifiable, Codable, Equatable {
     public var lastRunDay: String?
     /// 있으면 시각 대신 이 이벤트가 생길 때 울린다 (hour·minute·repeatRule 은 쓰지 않음).
     public var trigger: Trigger?
+    /// 알림 그룹 이름. nil 이면 "그룹 없음".
+    public var group: String?
 
     public init(id: UUID = UUID(), title: String, prompt: String, hour: Int, minute: Int,
-                repeatRule: Repeat, enabled: Bool = true, lastRunDay: String? = nil, trigger: Trigger? = nil) {
+                repeatRule: Repeat, enabled: Bool = true, lastRunDay: String? = nil, trigger: Trigger? = nil,
+                group: String? = nil) {
         self.trigger = trigger
+        self.group = group
         self.id = id
         self.title = title
         self.prompt = prompt
@@ -101,6 +105,17 @@ public enum AlarmStore {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try? encoder.encode(alarms).write(to: file, options: .atomic)
+    }
+
+    public static var groupsFile: URL { AppPaths.dataDir.appendingPathComponent("alarm-groups.json") }
+
+    public static func loadGroups() -> [String] {
+        (try? Data(contentsOf: groupsFile)).flatMap { try? JSONDecoder().decode([String].self, from: $0) } ?? []
+    }
+
+    public static func saveGroups(_ groups: [String]) {
+        try? FileManager.default.createDirectory(at: AppPaths.dataDir, withIntermediateDirectories: true)
+        try? JSONEncoder().encode(groups).write(to: groupsFile, options: .atomic)
     }
 
     public static func resolvePrompt(_ alarm: Alarm, settings: AppSettings) -> String? {

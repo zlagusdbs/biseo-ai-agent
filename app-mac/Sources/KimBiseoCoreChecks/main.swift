@@ -189,6 +189,23 @@ do {
     check(six.lastRunDay == nil && six.shouldRun(now: cal.date(byAdding: .hour, value: 4, to: afternoon)!, calendar: cal), "proposal: 오늘 남은 18시는 울림")
 }
 
+// MARK: AlarmGroup
+do {
+    let a = Alarm(title: "1:1 요청", prompt: "", hour: 9, minute: 0, repeatRule: .daily, group: "1:1")
+    let b = Alarm(title: "근무일정", prompt: "p", hour: 10, minute: 0, repeatRule: .weekdays)
+    let c = Alarm(title: "1:1 요청", prompt: "", hour: 13, minute: 0, repeatRule: .daily, enabled: false, group: "1:1")
+    let d = Alarm(title: "x", prompt: "p", hour: 11, minute: 0, repeatRule: .daily, group: "지운 그룹")
+    let t = Alarm(title: "리뷰", prompt: "", hour: 0, minute: 0, repeatRule: .daily,
+                  trigger: Trigger(system: "github", event: "github.review_requested"), group: "1:1")
+    let split = AlarmGroup.make([a, b, c, d, t], groups: ["1:1", "빈 그룹"])
+    check(split.groups.map(\.alarms.count) == [3, 0] && split.ungrouped.map(\.id) == [b.id, d.id],
+          "group: 그룹 순서대로, 빈 그룹도, 없는 그룹 이름은 그룹 없음으로")
+    check(split.groups[0].summary == "09:00 · 13:00 매일 · 트리거 1" && split.groups[0].anyEnabled, "group: 요약과 켜짐")
+    check(split.groups[1].summary.contains("끌어다"), "group: 빈 그룹 안내")
+    let old = #"[{"id":"6F1D6F5E-0000-0000-0000-000000000003","title":"t","prompt":"p","hour":9,"minute":0,"repeatRule":{"daily":{}},"enabled":true}]"#
+    check((try? JSONDecoder().decode([Alarm].self, from: Data(old.utf8)))?.first?.group == nil, "group: 예전 알림 파일은 그룹 없음")
+}
+
 // MARK: AppSettings
 do {
     let old = #"{"repoDir":"/r","claudePath":"/c","uvPath":"/u","reportHour":10,"reportMinute":0,"lastReportDay":"2026-10-21"}"#
