@@ -57,7 +57,7 @@ public struct JiraCreated: Codable, Equatable {
 }
 
 /// 채팅 답변의 ```kimbiseo-jira 블록과, 질문에 몰래 붙이는 안내.
-/// 프로젝트·유형·기간 같은 기본값은 앱 설정이 아니라 김비서 폴더의 rules/jira.md 에 적어 두고 Claude 가 그대로 따른다.
+/// 프로젝트·유형·기간 같은 기본값은 앱 설정이 아니라 김비서 폴더의 skills/jira.md 에 적어 두고 Claude 가 그대로 따른다.
 public enum JiraProposal {
     private struct Block: Decodable {
         let issue: JiraDraft?
@@ -104,12 +104,12 @@ public enum JiraProposal {
             담당자(Assignee)와 보고자는 앱이 등록할 때 연결된 Jira 계정 본인으로 자동으로 넣으므로 블록에 쓰지 않고, \
             담당자를 못 정한다고 말하지 않는다. 앞에서 못 한다고 답했더라도 그건 틀린 답이었으니 바로잡고, \
             물으면 "[Jira에 등록]을 누르면 담당자는 본인으로 들어가요. 카드에도 「담당자 나」로 보여요" 라고 답한다. \
-            기본값(프로젝트 키, 개발/일반 업무 유형, Original Estimate, Target start·end 규칙, Epic Link)은 [사용자 규칙]의 Jira 규칙을 따른다. \
+            기본값(프로젝트 키, 개발/일반 업무 유형, Original Estimate, Target start·end 규칙, Epic Link)은 Jira 스킬(skills/jira.md)을 따르고, 본문이 안 보이면 read_skill 로 읽는다. \
             날짜 규칙은 오늘 날짜로 실제 날짜(yyyy-MM-dd)를 계산해 넣는다. 사용자가 따로 말한(강조한) 항목만 이번 이슈에서 바꾼다. \
-            규칙에 프로젝트 키가 없으면 블록을 붙이기 전에 프로젝트, 이슈 유형(개발 일/일반 업무), Original Estimate, \
+            스킬에 프로젝트 키가 없으면 블록을 붙이기 전에 프로젝트, 이슈 유형(개발 일/일반 업무), Original Estimate, \
             Target start·end 규칙, Epic Link 를 먼저 물어본다 (이미 다 말했으면 묻지 않는다). 프로젝트 이름을 말하면 jira_projects 로 키를 찾아 확인한다. \
             답을 받아 초안을 만들 때, 또는 사용자가 "앞으로 프로젝트는 ~" 처럼 기본값을 바꾸라고 할 때는 \
-            kimbiseo-rule 블록으로 file "jira" 에 규칙 한 줄씩 저장을 제안한다 (예: "프로젝트 키: KEY", "개발이면 Story, 일반 업무면 Task"). \
+            kimbiseo-rule 블록으로 file "jira" 에 한 줄씩 저장을 제안한다 (skills/jira.md 에 들어간다) (예: "프로젝트 키: KEY", "개발이면 Story, 일반 업무면 Task"). \
             summary 는 지시 내용을 짧고 명확한 제목으로, description 은 Jira 위키 문법(h3. 제목, * 목록, # 번호)으로 \
             배경·할 일·완료 조건을 보기 좋게 정리한다. \
             본문은 초안을 한두 줄로 요약하고 "아래 카드에서 확인하고 [Jira에 등록]을 누르면 등록돼요" 로 끝낸다. \

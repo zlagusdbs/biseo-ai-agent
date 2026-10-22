@@ -481,9 +481,17 @@ enum SystemNames {
     }
 }
 
-/// 트리거 설명 아이콘. 마우스를 올리거나 누르면 말풍선으로 동작 방식을 알려 준다.
-/// (시트·패널 안에서는 macOS 기본 툴팁(.help)이 잘 안 떠서 말풍선을 쓴다)
+/// 트리거 설명 아이콘.
 struct TriggerHelpIcon: View {
+    var body: some View {
+        HelpIcon(text: "켜져 있는 동안 5분마다 확인해서, 새로 생긴 것만 알려 드려요.\n처음 켤 때 이미 있던 건 알리지 않아요.")
+    }
+}
+
+/// ? 아이콘. 마우스를 올리거나 누르면 말풍선으로 설명한다.
+/// (시트·패널 안에서는 macOS 기본 툴팁(.help)이 잘 안 떠서 말풍선을 쓴다)
+struct HelpIcon: View {
+    let text: String
     @State private var showing = false
 
     var body: some View {
@@ -494,10 +502,10 @@ struct TriggerHelpIcon: View {
             .onHover { showing = $0 }
             .onTapGesture { showing.toggle() }
             .popover(isPresented: $showing, arrowEdge: .bottom) {
-                Text("켜져 있는 동안 5분마다 확인해서, 새로 생긴 것만 알려 드려요.\n처음 켤 때 이미 있던 건 알리지 않아요.")
+                Text(text)
                     .font(.callout)
                     .padding(10)
-                    .frame(width: 260, alignment: .leading)
+                    .frame(width: 280, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
     }

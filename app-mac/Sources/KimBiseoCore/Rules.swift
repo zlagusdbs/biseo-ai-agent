@@ -1,48 +1,70 @@
 import Foundation
 
-/// 김비서 규칙 md. 김비서 폴더(앱 데이터 폴더) 하나에서 Claude Code 처럼 관리한다.
-///   CLAUDE.md      전체 지시. claude 를 김비서 폴더 아래(work/)에서 실행하므로 Claude Code 가 스스로 읽는다.
-///   rules/*.md     주제별 규칙 (jira.md, memory.md …). 질문할 때마다 앱이 시스템 안내 뒤에 붙인다.
+/// 김비서 폴더(앱 데이터 폴더)의 md. Claude Code 처럼 세 가지로 나눈다.
+///   root    CLAUDE.md     전체 지시. claude 를 김비서 폴더 아래(work/)에서 실행하므로 Claude Code 가 스스로 읽는다. 지울 수 없다.
+///   rules   rules/*.md    질문마다 모두 읽는다 (짧게, 파일당 200줄 이하 권장). 기억(memory.md)도 여기.
+///   skills  skills/*.md   주제별 안내서. 목록(한 줄 설명)만 늘 보내고, 본문은 질문에 키워드가 있을 때만 붙인다.
+///                         그 밖에 필요하면 Claude 가 read_skill 로 읽는다.
 /// 처음 실행하면 저장소 shared/templates/ 의 예시를 복사해 준다.
 public enum Rules {
+    public enum Kind: String { case root, rule, skill }
+
     public struct File: Identifiable, Equatable {
         public let url: URL
         public var id: String { url.path }
         public init(url: URL) { self.url = url }
-        /// 김비서 폴더 기준 경로. 예: CLAUDE.md, rules/jira.md
+
+        public var kind: Kind {
+            switch url.deletingLastPathComponent().lastPathComponent {
+            case "rules": return .rule
+            case "skills": return .skill
+            default: return .root
+            }
+        }
+
+        /// 김비서 폴더 기준 경로. 예: CLAUDE.md, rules/memory.md, skills/jira.md
         public var name: String {
-            url.deletingLastPathComponent().lastPathComponent == "rules" ? "rules/\(url.lastPathComponent)" : url.lastPathComponent
+            kind == .root ? url.lastPathComponent : "\(url.deletingLastPathComponent().lastPathComponent)/\(url.lastPathComponent)"
+        }
+
+        public var lineCount: Int {
+            ((try? String(contentsOf: url, encoding: .utf8)) ?? "").components(separatedBy: "\n").count
         }
     }
+
+    /// rules 파일 권장 최대 줄 수 (질문마다 모두 읽어서)
+    public static let ruleLineLimit = 200
 
     public static var homeDir: URL { AppPaths.dataDir }
     public static var claudeMd: URL { homeDir.appendingPathComponent("CLAUDE.md") }
     public static var myDir: URL { homeDir.appendingPathComponent("rules", isDirectory: true) }
+    public static var skillsDir: URL { homeDir.appendingPathComponent("skills", isDirectory: true) }
 
     public static func templatesDir(settings: AppSettings) -> URL {
         URL(fileURLWithPath: settings.repoDir).appendingPathComponent("shared/templates", isDirectory: true)
     }
 
-    /// CLAUDE.md (있으면) + rules/*.md 이름순
-    public static func files() -> [File] {
-        let rules = ((try? FileManager.default.contentsOfDirectory(at: myDir, includingPropertiesForKeys: nil)) ?? [])
+    private static func md(in dir: URL) -> [URL] {
+        ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? [])
             .filter { $0.pathExtension == "md" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
-        let top = FileManager.default.fileExists(atPath: claudeMd.path) ? [claudeMd] : []
-        return (top + rules).map { File(url: $0) }
     }
 
-    /// 규칙 파일 하나의 머리말. 파일 맨 위에 이렇게 적는다 (없으면 제목 줄과 파일 이름으로 대신함).
+    /// CLAUDE.md (있으면) + rules/*.md + skills/*.md
+    public static func files() -> [File] {
+        let top = FileManager.default.fileExists(atPath: claudeMd.path) ? [claudeMd] : []
+        return (top + md(in: myDir) + md(in: skillsDir)).map { File(url: $0) }
+    }
+
+    /// 파일 맨 위 머리말. 없으면 제목 줄이 설명, 파일 이름이 키워드.
     ///     ---
     ///     description: Jira 이슈 등록·worklog·기본값
     ///     keywords: jira, 지라, 이슈, worklog
-    ///     always: false
     ///     ---
     public struct Info: Equatable {
-        public let name: String          // rules/jira.md
+        public let name: String
         public let description: String
         public let keywords: [String]
-        public let always: Bool          // 질문과 상관없이 늘 붙임 (memory.md 기본)
         public let body: String          // 머리말을 뺀 본문
 
         public static func parse(name: String, text: String) -> Info {
@@ -62,41 +84,43 @@ public enum Rules {
             let heading = body.components(separatedBy: "\n").first { $0.hasPrefix("# ") }.map { String($0.dropFirst(2)) }
             let keywords = (meta["keywords"]?.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() } ?? [])
                 .filter { !$0.isEmpty }
-            return Info(name: name,
-                        description: meta["description"] ?? heading ?? stem,
-                        keywords: keywords.isEmpty ? [stem.lowercased()] : keywords,
-                        always: meta["always"].map { $0.lowercased() == "true" } ?? (stem == "memory"),
-                        body: body)
+            return Info(name: name, description: meta["description"] ?? heading ?? stem,
+                        keywords: keywords.isEmpty ? [stem.lowercased()] : keywords, body: body)
         }
 
-        /// 질문에 키워드가 들어 있으면 이 규칙이 필요하다고 본다 (띄어쓰기·대소문자 무시).
+        /// 질문에 키워드가 들어 있으면 이 스킬이 필요하다고 본다 (띄어쓰기·대소문자 무시).
         public func matches(_ message: String) -> Bool {
             let compact = message.replacingOccurrences(of: " ", with: "").lowercased()
-            return always || keywords.contains { compact.contains($0.replacingOccurrences(of: " ", with: "")) }
+            return keywords.contains { compact.contains($0.replacingOccurrences(of: " ", with: "")) }
         }
     }
 
-    public static func infos() -> [Info] {
-        files().filter { $0.url != claudeMd }.compactMap { file in
+    private static func infos(_ kind: Kind) -> [Info] {
+        files().filter { $0.kind == kind }.compactMap { file in
             (try? String(contentsOf: file.url, encoding: .utf8)).map { Info.parse(name: file.name, text: $0) }
         }
     }
 
-    /// 시스템 안내에 붙일 규칙. 모든 규칙의 한 줄 설명(목록)은 늘 붙이고, 본문은 질문에 맞는 것만 붙인다
-    /// (규칙이 많아져도 질문마다 읽는 양이 늘지 않게). 나머지는 Claude 가 read_rule 로 필요할 때 읽는다.
+    /// 시스템 안내에 붙일 글: rules 본문 전부 + skills 목록 + 질문에 맞는 skills 본문.
     /// CLAUDE.md 는 Claude Code 가 스스로 읽으므로 넣지 않는다.
     public static func prompt(for message: String) -> String {
-        render(infos(), message: message)
+        render(rules: infos(.rule), skills: infos(.skill), message: message)
     }
 
-    public static func render(_ infos: [Info], message: String) -> String {
-        guard !infos.isEmpty else { return "" }
-        let index = infos.map { "- \($0.name): \($0.description)" }.joined(separator: "\n")
-        let attached = infos.filter { $0.matches(message) && !$0.body.isEmpty }
-        var text = "\n\n# 사용자 규칙 (김비서 폴더의 rules/*.md)\n\n규칙 목록:\n\(index)\n"
-        text += "아래에 본문이 없는 규칙이 이번 질문에 필요하면 read_rule 도구로 읽고 따른다.\n"
-        for info in attached {
-            text += "\n## \(info.name)\n\(info.body)\n"
+    public static func render(rules: [Info], skills: [Info], message: String) -> String {
+        var text = ""
+        let ruleBodies = rules.filter { !$0.body.isEmpty }
+        if !ruleBodies.isEmpty {
+            text += "\n\n# 사용자 규칙 (김비서 폴더의 rules/*.md, 늘 지킨다)\n"
+            for info in ruleBodies { text += "\n## \(info.name)\n\(info.body)\n" }
+        }
+        if !skills.isEmpty {
+            text += "\n\n# 사용자 스킬 (김비서 폴더의 skills/*.md)\n\n스킬 목록:\n"
+            text += skills.map { "- \($0.name): \($0.description)" }.joined(separator: "\n")
+            text += "\n아래에 본문이 없는 스킬이 이번 질문에 필요하면 read_skill 도구로 읽고 따른다.\n"
+            for info in skills where info.matches(message) && !info.body.isEmpty {
+                text += "\n## \(info.name)\n\(info.body)\n"
+            }
         }
         return text
     }
@@ -107,11 +131,12 @@ public enum Rules {
         let source = templatesDir(settings: settings)
         let fm = FileManager.default
         var copied = 0
-        try? fm.createDirectory(at: myDir, withIntermediateDirectories: true)
         var pairs = [(source.appendingPathComponent("CLAUDE.md"), claudeMd)]
-        for url in (try? fm.contentsOfDirectory(at: source.appendingPathComponent("rules"), includingPropertiesForKeys: nil)) ?? []
-        where url.pathExtension == "md" {
-            pairs.append((url, myDir.appendingPathComponent(url.lastPathComponent)))
+        for (folder, target) in [("rules", myDir), ("skills", skillsDir)] {
+            try? fm.createDirectory(at: target, withIntermediateDirectories: true)
+            for url in md(in: source.appendingPathComponent(folder)) {
+                pairs.append((url, target.appendingPathComponent(url.lastPathComponent)))
+            }
         }
         for (from, to) in pairs where fm.fileExists(atPath: from.path) && !fm.fileExists(atPath: to.path) {
             if (try? fm.copyItem(at: from, to: to)) != nil { copied += 1 }
@@ -119,26 +144,34 @@ public enum Rules {
         return copied
     }
 
-    /// 새 규칙 파일. 이름은 영문·숫자·한글·-·_ 만 남긴다. 이미 있으면 그 파일.
-    public static func create(_ name: String) throws -> URL {
-        let url = myDir.appendingPathComponent(safeName(name) + ".md")
-        try FileManager.default.createDirectory(at: myDir, withIntermediateDirectories: true)
+    /// 새 규칙·스킬 파일. 이름은 영문·숫자·한글·-·_ 만 남긴다. 이미 있으면 그 파일. 스킬은 머리말 틀을 넣어 준다.
+    public static func create(_ name: String, kind: Kind) throws -> URL {
+        let dir = kind == .skill ? skillsDir : myDir
+        let stem = safeName(name)
+        let url = dir.appendingPathComponent(stem + ".md")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         if !FileManager.default.fileExists(atPath: url.path) {
-            try "# \(safeName(name))\n\n- \n".write(to: url, atomically: true, encoding: .utf8)
+            let body = kind == .skill
+                ? "---\ndescription: \(stem) 관련 안내 (한 줄 설명)\nkeywords: \(stem)\n---\n# \(stem)\n\n- \n"
+                : "# \(stem)\n\n- \n"
+            try body.write(to: url, atomically: true, encoding: .utf8)
         }
         return url
     }
 
+    /// CLAUDE.md 는 지울 수 없다 (Claude Code 가 읽는 기본 지시).
     public static func delete(_ file: File) throws {
+        guard file.kind != .root else { return }
         try FileManager.default.removeItem(at: file.url)
     }
 
-    /// 내 규칙 파일에 한 줄 추가 (없으면 만든다).
+    /// 한 줄 추가. 같은 이름의 스킬이 있으면 그 스킬에, 없으면 rules/ 에 (없으면 만든다).
     @discardableResult
     public static func append(_ text: String, to name: String) throws -> URL {
         let safe = safeName(name)
-        let url = myDir.appendingPathComponent(safe + ".md")
-        try FileManager.default.createDirectory(at: myDir, withIntermediateDirectories: true)
+        let skill = skillsDir.appendingPathComponent(safe + ".md")
+        let url = FileManager.default.fileExists(atPath: skill.path) ? skill : myDir.appendingPathComponent(safe + ".md")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         var body = (try? String(contentsOf: url, encoding: .utf8)) ?? "# \(safe)\n\n"
         if !body.hasSuffix("\n") { body += "\n" }
         body += "- \(text.trimmingCharacters(in: .whitespacesAndNewlines))\n"

@@ -93,10 +93,10 @@ def work_day_check(date: str = "") -> dict:
     return result
 
 
-def read_rule(name: str) -> dict:
-    """김비서 폴더 rules/ 의 규칙 md 를 읽는다. name 은 jira 또는 rules/jira.md 처럼.
+def read_skill(name: str) -> dict:
+    """김비서 폴더 skills/ 의 스킬 md 를 읽는다. name 은 jira 또는 skills/jira.md 처럼.
 
-    질문에 맞는 규칙 본문이 시스템 안내에 없을 때, 규칙 목록의 설명을 보고 필요한 것만 읽는다.
+    질문에 필요한 스킬 본문이 시스템 안내에 없을 때, 스킬 목록의 설명을 보고 필요한 것만 읽는다.
     """
     from . import rules
     return rules.read(name)
@@ -155,7 +155,7 @@ def github_review_requests() -> dict:
     return _with_system("github", lambda base_url, cred: {"pullRequests": github_client.review_requests(base_url)})
 
 
-TOOLS = [read_rule, jira_search, jira_projects, jira_my_worklogs, work_day_check, wiki_search, wiki_get_page, hr_holidays, hr_flexwork_week,
+TOOLS = [read_skill, jira_search, jira_projects, jira_my_worklogs, work_day_check, wiki_search, wiki_get_page, hr_holidays, hr_flexwork_week,
          deploy_my_releases, deploy_approvals, deploy_domain_releases, deploy_release_search, github_review_requests]
 for _tool in TOOLS:
     mcp.tool()(_tool)

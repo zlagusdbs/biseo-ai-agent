@@ -51,29 +51,29 @@ cd mcp-server && uv sync && uv run pytest && cd ..
 open app-mac/build/KimBiseo.app
 ```
 
-### 규칙과 기억
+### 규칙과 기억 (CLAUDE.md · rules · skills)
 
 김비서 폴더(`~/Library/Application Support/kim-biseo/`)에서 Claude Code 처럼 md 로 관리한다. 처음 실행하면 `shared/templates/` 의 예시가 복사된다.
 
 ```
 kim-biseo/
- ├ CLAUDE.md        전체 지시 (Claude Code 가 직접 읽음)
- └ rules/
-    ├ jira.md       Jira 규칙과 우리 팀 기본값 (프로젝트 키, 기간, worklog 고정 이슈 …)
-    └ memory.md     기억 (채팅에서 "기억해" → [기억하기])
+ ├ CLAUDE.md        root: 늘 적용하는 기본 지시. Claude Code 가 직접 읽음. 지울 수 없음
+ ├ rules/           질문마다 모두 읽음. 짧게 (파일당 200줄 이하)
+ │  └ memory.md     기억 (채팅에서 "기억해" → [기억하기])
+ └ skills/          주제가 나올 때만 읽음
+    └ jira.md       Jira 이슈 등록·worklog·우리 팀 기본값 (프로젝트 키, 기간, 고정 이슈 …)
 ```
 
-- 질문할 때마다 모든 규칙의 한 줄 설명만 보내고, 본문은 질문에 키워드가 있는 파일만 붙인다 (나머지는 김비서가 필요하면 `read_rule` 로 읽음). 파일 맨 위 머리말로 정한다:
+- skills 는 맨 위 머리말로 설명과 키워드를 정한다. 질문마다 설명 한 줄만 보내고, 질문에 키워드가 있으면 본문을 붙인다. 키워드가 없어도 필요하면 김비서가 `read_skill` 로 읽는다.
   ```
   ---
   description: Jira 이슈 등록·worklog·기본값
   keywords: jira, 지라, 이슈, worklog, 회의
   ---
   ```
-  머리말이 없으면 제목 줄이 설명, 파일 이름이 키워드다. `memory.md` 는 늘 붙인다.
-- ⚙️ 설정 → 「규칙」에서 파일을 열고, 지우고, 새로 만들 수 있다. 고친 내용은 다음 질문부터 바로 적용된다.
-- 채팅에서 "앞으로 지라 제목 앞에 [회의] 붙여줘" 처럼 말하고 [규칙에 저장]을 누르면 `rules/` 에 한 줄 추가된다.
-- `rules/jira.md` 의 「우리 팀 기본값」 예:
+- ⚙️ 설정 → root / rules / skills 칸에서 파일을 열고, 지우고(CLAUDE.md 는 제외), 새로 만들 수 있다. 고친 내용은 다음 질문부터 바로 적용된다.
+- 채팅에서 "앞으로 지라 제목 앞에 [회의] 붙여줘" 처럼 말하고 [규칙에 저장]을 누르면 같은 이름의 스킬(없으면 rules/)에 한 줄 추가된다.
+- `skills/jira.md` 의 「우리 팀 기본값」 예:
   ```
   - 프로젝트 키: MYPROJ
   - 이슈 유형: 개발이면 Story, 일반 업무면 Task
