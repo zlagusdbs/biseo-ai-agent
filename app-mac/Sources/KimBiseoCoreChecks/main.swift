@@ -171,6 +171,8 @@ do {
     check(AlarmProposal.extract(from: "```kimbiseo-alarm\n깨진 json\n```").text.isEmpty, "proposal: 깨진 블록도 본문에서 뺌")
     check(AlarmProposal.repeatRule("days:4,2,2") == .days([2, 4]) && AlarmProposal.repeatRule("once:2026-10-23") == .once("2026-10-23")
           && AlarmProposal.repeatRule("days:9") == nil && AlarmProposal.repeatRule("hourly") == nil, "proposal: 반복 규칙")
+    let grouped = AlarmProposal.extract(from: "```kimbiseo-alarm\n[{\"title\":\"a\",\"hour\":9,\"group\":\" 팀 미팅 \"},{\"title\":\"b\",\"hour\":10,\"group\":\"\"}]\n```").alarms
+    check(grouped.map(\.group) == ["팀 미팅", nil], "proposal: 그룹 이름 (빈 이름은 그룹 없음)")
     let loose = AlarmProposal.extract(from: "```kimbiseo-alarm\n[{\"time\":\"18:30\",\"repeat\":\"daily\",\"message\":\"m\"}]\n```").alarms
     check(loose.count == 1 && loose[0].hour == 18 && loose[0].minute == 30 && loose[0].title == "m", "proposal: time·message 키도 받음")
     check(AlarmProposal.looksLikeRequest("매일 9시에 잊지말라고 알림 기록해줘") && AlarmProposal.looksLikeRequest("매일 오전 9시에 1:1 알람을 해야 한다고 알람설정해줘")

@@ -79,13 +79,15 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// 채팅에서 제안된 알림을 등록한다. 이미 등록한 것은 건너뛰고,
-    /// 같은 제목이 여러 개면(09·13·18시 같은) 그 제목으로 그룹을 만들어 넣는다.
+    /// 채팅에서 제안된 알림을 등록한다. 이미 등록한 것은 건너뛴다.
+    /// 그룹 이름을 말했으면 그 그룹(없으면 새로 만듦)에, 아니면 같은 제목이 여러 개일 때(09·13·18시 같은) 그 제목으로 묶는다.
     func register(_ proposed: [Alarm]) {
         let titles = Dictionary(grouping: proposed, by: \.title)
         for var alarm in proposed where !alarms.contains(where: { $0.id == alarm.id }) {
             alarm.resetSchedule(now: Date(), calendar: .current)
-            if alarm.group == nil, (titles[alarm.title]?.count ?? 0) > 1 {
+            if let group = alarm.group {
+                addGroup(group)
+            } else if (titles[alarm.title]?.count ?? 0) > 1 {
                 alarm.group = alarm.title
                 addGroup(alarm.title)
             }

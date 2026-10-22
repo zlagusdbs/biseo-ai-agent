@@ -237,9 +237,20 @@ private struct AlarmProposalCard: View {
     let register: () -> Void
     let open: () -> Void
 
+    /// 들어갈 그룹. 직접 말한 이름, 없으면 같은 제목 여러 개일 때 그 제목 (AppModel.register 와 같은 규칙).
+    private var groupName: String? {
+        if let named = alarms.compactMap(\.group).first { return named }
+        return alarms.count > 1 && Set(alarms.map(\.title)).count == 1 ? alarms[0].title : nil
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("알림 \(alarms.count)개", systemImage: "bell.badge").font(.callout.weight(.medium))
+            HStack(spacing: 6) {
+                Label("알림 \(alarms.count)개", systemImage: "bell.badge").font(.callout.weight(.medium))
+                if let group = groupName {
+                    Label(group, systemImage: "folder").font(.caption).foregroundStyle(.secondary)
+                }
+            }
             ForEach(alarms) { alarm in
                 HStack(spacing: 6) {
                     Text(alarm.timeText).monospacedDigit()
