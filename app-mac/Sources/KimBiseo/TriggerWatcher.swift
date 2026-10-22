@@ -58,19 +58,19 @@ final class TriggerWatcher {
     private func notify(_ alarm: Alarm, _ item: EventItem) {
         let prompt = alarm.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty else {
-            notifier.send(title: "🔔 \(item.title)", body: item.summary)
-            reminders.add(title: item.title, text: item.summary, failed: false, url: item.url.isEmpty ? nil : item.url)
+            if alarm.toMac { notifier.send(title: "🔔 \(item.title)", body: item.summary) }
+            if alarm.toPanel { reminders.add(title: item.title, text: item.summary, failed: false, url: item.url.isEmpty ? nil : item.url) }
             return
         }
         let context = "다음 이벤트가 생겼다.\n- \(item.title)\n- \(item.summary)\n- 링크: \(item.url)\n\n요청: \(prompt)"
         model.chat.runReport(title: "\(alarm.title) · \(item.title)", prompt: context) { [notifier, reminders] response in
             switch response {
             case .success(let text, _):
-                notifier.send(title: "🔔 \(item.title)", body: Reminder.summary(of: text))
-                reminders.add(title: item.title, text: text, failed: false, url: item.url.isEmpty ? nil : item.url)
+                if alarm.toMac { notifier.send(title: "🔔 \(item.title)", body: Reminder.summary(of: text)) }
+                if alarm.toPanel { reminders.add(title: item.title, text: text, failed: false, url: item.url.isEmpty ? nil : item.url) }
             case .failure(let failure):
-                notifier.send(title: "🔔 \(item.title)", body: item.summary)
-                reminders.add(title: item.title, text: failure.message, failed: true, url: item.url.isEmpty ? nil : item.url)
+                if alarm.toMac { notifier.send(title: "🔔 \(item.title)", body: item.summary) }
+                if alarm.toPanel { reminders.add(title: item.title, text: failure.message, failed: true, url: item.url.isEmpty ? nil : item.url) }
             }
         }
     }

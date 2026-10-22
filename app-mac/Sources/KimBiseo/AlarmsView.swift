@@ -36,21 +36,6 @@ struct AlarmsView: View {
                 } label: { Label("추가", systemImage: "plus") }
             }
             .padding(12)
-            HStack(spacing: 14) {
-                Text("받을 곳").font(.caption).foregroundStyle(.secondary)
-                Toggle("Mac 알림", isOn: $model.settings.notifyMac)
-                    .help("화면 오른쪽 위에 잠깐 떴다가 알림 센터에 쌓이는 macOS 알림")
-                Toggle("미리 알림 창", isOn: $model.settings.notifyPanel)
-                    .help("화면 오른쪽 아래에 [확인]을 누를 때까지 남아 있는 김비서 카드")
-                if !model.settings.notifyMac && !model.settings.notifyPanel {
-                    Label("둘 다 끄면 알림이 오지 않아요", systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption).foregroundStyle(.orange)
-                }
-                Spacer()
-            }
-            .toggleStyle(.checkbox)
-            .padding(.horizontal, 12)
-            .padding(.bottom, 10)
             Divider()
 
             if model.alarms.isEmpty && model.alarmGroups.isEmpty {
@@ -201,9 +186,14 @@ extension AlarmsView {
                 Text(alarm.prompt == Alarm.dailyReportPrompt ? "내 미완료 Jira 를 정리해서 보고"
                      : alarm.prompt.isEmpty ? (alarm.trigger == nil ? "시각에 알림만" : "생기면 바로 알림") : alarm.prompt)
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                if let last = alarm.lastRunDay {
-                    Text("마지막 실행 \(last)").font(.caption2).foregroundStyle(.tertiary)
+                HStack(spacing: 8) {
+                    DeliveryBadge(on: alarm.toMac, symbol: "macwindow", text: "Mac 알림")
+                    DeliveryBadge(on: alarm.toPanel, symbol: "rectangle.bottomhalf.inset.filled", text: "미리 알림 창")
+                    if let last = alarm.lastRunDay {
+                        Text("마지막 실행 \(last)").foregroundStyle(.tertiary)
+                    }
                 }
+                .font(.caption2)
                 if case .done(let message, let failed) = model.alarmRuns[alarm.id] {
                     Label(message, systemImage: failed ? "xmark.circle.fill" : "checkmark.circle.fill")
                         .font(.caption).foregroundStyle(failed ? Color.red : Color.green)
@@ -369,6 +359,20 @@ struct AlarmEditor: View {
                     }
                 }
                 }
+                Section("받을 곳") {
+                    HStack(spacing: 16) {
+                        Toggle("Mac 알림", isOn: Binding(get: { alarm.toMac }, set: { alarm.notifyMac = $0 }))
+                            .help("화면 오른쪽 위에 잠깐 떴다가 알림 센터에 쌓이는 macOS 알림")
+                        Toggle("미리 알림 창", isOn: Binding(get: { alarm.toPanel }, set: { alarm.notifyPanel = $0 }))
+                            .help("화면 오른쪽 아래에 [확인]을 누를 때까지 남아 있는 김비서 카드")
+                    }
+                    .toggleStyle(.checkbox)
+                    if !alarm.toMac && !alarm.toPanel {
+                        Label("둘 다 끄면 알림이 오지 않아요\(mode == .time ? " (결과는 채팅창에만 남아요)" : "")",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                }
                 Section("무엇을") {
                     if !groups.isEmpty {
                         Picker("그룹", selection: $alarm.group) {
@@ -468,5 +472,19 @@ struct TriggerHelpIcon: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .help("켜져 있는 동안 5분마다 확인해서, 새로 생긴 것만 알려 드려요. 처음 켤 때 이미 있던 건 알리지 않아요.")
+    }
+}
+
+/// 알림 목록에서 받을 곳 표시. 꺼진 곳은 흐리게 줄을 긋는다.
+private struct DeliveryBadge: View {
+    let on: Bool
+    let symbol: String
+    let text: String
+
+    var body: some View {
+        Label(text, systemImage: symbol)
+            .foregroundStyle(on ? Color.secondary : Color.secondary.opacity(0.4))
+            .strikethrough(!on)
+            .help(on ? "\(text)으로 받아요" : "\(text)으로는 받지 않아요")
     }
 }

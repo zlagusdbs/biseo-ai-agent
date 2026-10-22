@@ -54,14 +54,14 @@ final class AlarmScheduler {
             if case .once = alarm.repeatRule { model.alarms[i].enabled = false }
         }
         if alarm.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            notifier.send(title: "🔔 \(alarm.title)", body: "잊지 마세요.")
-            reminders.add(title: alarm.title, text: "잊지 마세요: \(alarm.title)", failed: false)
+            if alarm.toMac { notifier.send(title: "🔔 \(alarm.title)", body: "잊지 마세요.") }
+            if alarm.toPanel { reminders.add(title: alarm.title, text: "잊지 마세요: \(alarm.title)", failed: false) }
             model.markDone(alarm.id, "알림 창에 보냈어요")
             return
         }
         guard let prompt = AlarmStore.resolvePrompt(alarm, settings: model.settings) else {
-            notifier.send(title: alarm.title, body: "알림 내용을 읽지 못했어요.")
-            reminders.add(title: alarm.title, text: "알림 내용을 읽지 못했어요.", failed: true)
+            if alarm.toMac { notifier.send(title: alarm.title, body: "알림 내용을 읽지 못했어요.") }
+            if alarm.toPanel { reminders.add(title: alarm.title, text: "알림 내용을 읽지 못했어요.", failed: true) }
             model.markDone(alarm.id, "알림 내용을 읽지 못했어요", failed: true)
             return
         }
@@ -70,12 +70,12 @@ final class AlarmScheduler {
             switch response {
             case .success(let text, _):
                 let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
-                notifier.send(title: "🔔 \(alarm.title)", body: lines.prefix(4).joined(separator: "\n"))
-                reminders.add(title: alarm.title, text: text, failed: false)
+                if alarm.toMac { notifier.send(title: "🔔 \(alarm.title)", body: lines.prefix(4).joined(separator: "\n")) }
+                if alarm.toPanel { reminders.add(title: alarm.title, text: text, failed: false) }
                 model.markDone(alarm.id, "끝났어요. 결과는 알림 창과 채팅에 있어요")
             case .failure(let failure):
-                notifier.send(title: "🔔 \(alarm.title) 실패", body: failure.message)
-                reminders.add(title: alarm.title, text: failure.message, failed: true)
+                if alarm.toMac { notifier.send(title: "🔔 \(alarm.title) 실패", body: failure.message) }
+                if alarm.toPanel { reminders.add(title: alarm.title, text: failure.message, failed: true) }
                 model.markDone(alarm.id, failure.message, failed: true)
             }
         }
