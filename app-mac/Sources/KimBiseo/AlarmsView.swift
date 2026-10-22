@@ -103,6 +103,9 @@ extension AlarmsView {
                         Text(group.summary).font(.callout.monospacedDigit()).foregroundStyle(.secondary).lineLimit(2)
                     }
                     Spacer()
+                    if group.alarms.contains(where: { model.alarmRuns[$0.id] == .running }) {
+                        ProgressView().controlSize(.mini).help("이 그룹에서 실행 중인 알림이 있어요")
+                    }
                     Text("\(group.alarms.count)개").font(.caption).foregroundStyle(.secondary)
                 }
                 .contentShape(Rectangle())
@@ -186,10 +189,23 @@ extension AlarmsView {
                 if let last = alarm.lastRunDay {
                     Text("마지막 실행 \(last)").font(.caption2).foregroundStyle(.tertiary)
                 }
+                if case .done(let message, let failed) = model.alarmRuns[alarm.id] {
+                    Label(message, systemImage: failed ? "xmark.circle.fill" : "checkmark.circle.fill")
+                        .font(.caption).foregroundStyle(failed ? Color.red : Color.green)
+                        .transition(.opacity)
+                }
             }
             Spacer()
-            Button { model.runAlarmNow(alarm) } label: { Image(systemName: "play.fill") }
-                .buttonStyle(.borderless).help(alarm.trigger == nil ? "지금 실행" : "지금 확인")
+            if model.alarmRuns[alarm.id] == .running {
+                HStack(spacing: 4) {
+                    ProgressView().controlSize(.small)
+                    Text(alarm.trigger == nil ? "실행 중…" : "확인 중…").font(.caption).foregroundStyle(.secondary)
+                }
+                .help(alarm.trigger == nil ? "김비서가 시킨 일을 하고 있어요. 끝나면 알림 창에 결과가 떠요" : "새로 생긴 게 있는지 보고 있어요")
+            } else {
+                Button { model.runAlarmNow(alarm) } label: { Image(systemName: "play.fill") }
+                    .buttonStyle(.borderless).help(alarm.trigger == nil ? "지금 실행" : "지금 확인")
+            }
             Button { editing = alarm } label: { Image(systemName: "pencil") }
                 .buttonStyle(.borderless).help("수정")
             Button(role: .destructive) { deletingAlarm = alarm } label: { Image(systemName: "trash") }

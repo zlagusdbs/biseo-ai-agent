@@ -31,15 +31,19 @@ final class TriggerWatcher {
         }
     }
 
-    /// 한 알림 확인. [지금 실행] 에서도 부른다.
-    func check(_ alarm: Alarm) async {
-        guard let trigger = alarm.trigger, !checking.contains(alarm.id) else { return }
+    /// 한 알림 확인. [지금 실행] 에서도 부르고, 결과를 한 줄로 돌려준다 (알림 목록에 잠깐 보임).
+    @discardableResult
+    func check(_ alarm: Alarm) async -> (message: String, failed: Bool) {
+        guard let trigger = alarm.trigger, !checking.contains(alarm.id) else { return ("이미 확인 중이에요", false) }
         checking.insert(alarm.id)
         defer { checking.remove(alarm.id) }
-        guard let items = try? await KimbiseoCLI.events(trigger.event, settings: model.settings) else { return }
+        guard let items = try? await KimbiseoCLI.events(trigger.event, settings: model.settings) else {
+            return ("확인하지 못했어요. 연결 메뉴를 확인해 주세요", true)
+        }
 
         var seenAll = Self.loadSeen()
         let key = alarm.id.uuidString
+        let firstTime = seenAll[key] == nil
         let fresh = TriggerDiff.newItems(current: items, seen: seenAll[key].map(Set.init))
         seenAll[key] = Array(Set(seenAll[key] ?? []).union(items.map(\.key)))
         Self.saveSeen(seenAll)
@@ -47,6 +51,8 @@ final class TriggerWatcher {
         for item in fresh {
             notify(alarm, item)
         }
+        if firstTime { return ("처음이라 지금 있는 \(items.count)건을 기준으로 잡았어요", false) }
+        return fresh.isEmpty ? ("새로 생긴 것 없어요", false) : ("새로 \(fresh.count)건, 알림 창에 보냈어요", false)
     }
 
     private func notify(_ alarm: Alarm, _ item: EventItem) {
