@@ -10,6 +10,7 @@ struct SettingsView: View {
             Section("이름") {
                 TextField("주인 이름", text: $model.settings.ownerName, prompt: Text("김비서가 부를 이름"))
             }
+            MemorySection()
             RulesSection(settings: model.settings)
             Section("단축키") {
                 HotkeyRecorder(hotkey: $model.settings.hotkey)
@@ -230,4 +231,50 @@ private struct RulesSection: View {
     }
 
     private func reload() { files = Rules.files(settings: settings) }
+}
+
+/// 김비서 기억 (memory.md). 채팅에서 "기억해" 하고 [기억하기]를 누르면 쌓이고, 여기서 지울 수 있다.
+private struct MemorySection: View {
+    @State private var items: [String] = []
+    @State private var draft = ""
+
+    var body: some View {
+        Section {
+            if items.isEmpty {
+                Text("아직 기억한 게 없어요. 채팅에서 \"내 팀은 가격팀이야, 기억해\" 처럼 말해 보세요.")
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(items, id: \.self) { item in
+                HStack {
+                    Text(item)
+                    Spacer()
+                    Button(role: .destructive) {
+                        try? Memory.forget(item)
+                        reload()
+                    } label: { Image(systemName: "trash") }
+                        .buttonStyle(.borderless).help("잊기")
+                }
+            }
+            HStack {
+                TextField("", text: $draft, prompt: Text("직접 추가. 예: 매주 화요일 10시 팀 회의"))
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(add)
+                Button("추가", action: add).disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        } header: {
+            Text("기억")
+        } footer: {
+            Text("이 Mac 의 memory.md 에 저장돼요. 새 대화를 시작해도 김비서가 알고 있어요.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .task { reload() }
+    }
+
+    private func add() {
+        try? Memory.add(draft)
+        draft = ""
+        reload()
+    }
+
+    private func reload() { items = Memory.items() }
 }

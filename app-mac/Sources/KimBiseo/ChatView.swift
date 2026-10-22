@@ -68,7 +68,11 @@ struct ChatView: View {
                             }
                             if !message.rules.isEmpty {
                                 RuleProposalCard(notes: message.rules, saved: message.rulesSaved) {
-                                    for note in message.rules { try? Rules.append(note.text, to: note.file) }
+                                    for note in message.rules {
+                                        if note.isForget { try? Memory.forget(note.text, in: note.file) }
+                                        else if note.isMemory { try? Memory.add(note.text) }
+                                        else { try? Rules.append(note.text, to: note.file) }
+                                    }
                                     chat.update(message.id) { $0.rulesSaved = true }
                                 }
                             }
@@ -470,21 +474,29 @@ private struct RuleProposalCard: View {
     let saved: Bool
     let save: () -> Void
 
+    /// 기억만 / 잊기만 / 그 밖(규칙)에 따라 제목·버튼 말을 바꾼다.
+    private var kind: (title: String, symbol: String, button: String, done: String) {
+        if notes.allSatisfy(\.isForget) { return ("잊기", "eraser", "잊기", "지웠어요") }
+        if notes.allSatisfy(\.isMemory) { return ("기억", "brain", "기억하기", "기억했어요. 새 대화에서도 알아요") }
+        return ("규칙", "pin", "규칙에 저장", "저장했어요. 다음 대화부터 늘 적용돼요")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("규칙 \(notes.count)개", systemImage: "pin").font(.callout.weight(.medium))
+            Label("\(kind.title) \(notes.count)개", systemImage: kind.symbol).font(.callout.weight(.medium))
             ForEach(notes, id: \.self) { note in
                 HStack(alignment: .top, spacing: 6) {
-                    Text("\(note.file).md").font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text(note.text).font(.callout)
+                    Text(note.isForget ? "지울 것" : note.isMemory ? "기억" : "\(note.file).md")
+                        .font(.caption.monospaced()).foregroundStyle(.secondary)
+                    Text(note.text).font(.callout).strikethrough(note.isForget)
                 }
             }
             HStack {
                 if saved {
-                    Label("저장했어요. 다음 대화부터 늘 적용돼요", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Label(kind.done, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     Button("폴더 열기") { NSWorkspace.shared.open(Rules.myDir) }.buttonStyle(.link)
                 } else {
-                    Button("규칙에 저장", action: save).buttonStyle(.borderedProminent)
+                    Button(kind.button, action: save).buttonStyle(.borderedProminent)
                 }
             }
             .padding(.top, 2)
