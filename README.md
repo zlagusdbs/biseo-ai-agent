@@ -1,4 +1,4 @@
-# 김비서 (kimbiseo-ai-agent)
+# 김비서 (biseo-ai-agent)
 
 macOS 메뉴바에 사는 개인 업무 AI 비서. 단축키로 채팅창을 열고 대화하듯 요청하면, Claude 가 사내 시스템(사내 포털 Portal, Jira, Wiki, 인사·근태, 배포 관리 Deploy, 전자결재 Approval, Permit, GitHub Enterprise)과 Microsoft 365(메일·일정·Teams)를 **조회**해서 답한다. 정해 둔 시각에 알아서 보고하고, 내가 리뷰어로 지정된 PR 이 생기면 알려 준다.
 
@@ -36,7 +36,7 @@ macOS 메뉴바에 사는 개인 업무 AI 비서. 단축키로 채팅창을 열
 ## 설치
 
 ```bash
-git clone https://github.com/zlagusdbs/kimbiseo-ai-agent.git ~/Workspace/kim-biseo
+git clone https://github.com/zlagusdbs/biseo-ai-agent.git ~/Workspace/kim-biseo
 cd ~/Workspace/kim-biseo
 
 # 1. 회사 시스템 주소 설정 (이 파일은 Git 에 올라가지 않는다)
