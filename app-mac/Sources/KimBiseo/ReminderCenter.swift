@@ -8,6 +8,8 @@ final class ReminderCenter: ObservableObject {
     @Published private(set) var now = Date()
     /// 보일 카드가 바뀌면 불린다 (창 크기·표시 갱신).
     var onChange: () -> Void = {}
+    /// 알림 메뉴의 「미리 알림 창」 체크. 꺼져 있으면 새 카드를 띄우지 않는다.
+    var isEnabled: () -> Bool = { true }
 
     private var timer: Timer?
     private static var file: URL { AppPaths.dataDir.appendingPathComponent("reminders.json") }
@@ -30,6 +32,7 @@ final class ReminderCenter: ObservableObject {
     }
 
     func add(title: String, text: String, failed: Bool, url: String? = nil) {
+        guard isEnabled() else { return }
         queue.add(Reminder(title: title, summary: Reminder.summary(of: text), firedAt: Date(), failed: failed, url: url))
         changed()
     }

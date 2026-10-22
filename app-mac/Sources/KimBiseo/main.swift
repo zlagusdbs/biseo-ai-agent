@@ -99,6 +99,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.model.selected = .chat
             self?.showPopover()
         }
+        notifier.isEnabled = { [weak self] in self?.model.settings.notifyMac ?? true }
+        reminders.isEnabled = { [weak self] in self?.model.settings.notifyPanel ?? true }
         reminders.start()
         reminderPanel.refresh()
         triggers = TriggerWatcher(model: model, notifier: notifier, reminders: reminders)
