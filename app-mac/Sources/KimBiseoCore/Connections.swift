@@ -2,7 +2,8 @@ import Foundation
 
 /// `kimbiseo status` 출력 한 줄.
 public struct SystemStatus: Decodable, Identifiable, Equatable {
-    public enum Status: String, Decodable { case connected, disconnected, expired, unavailable }
+    /// external: claude.ai 커넥터처럼 앱이 따로 확인하는 것 (Microsoft 365)
+    public enum Status: String, Decodable { case connected, disconnected, expired, unavailable, external }
 
     public let system: String
     public let name: String
@@ -11,6 +12,8 @@ public struct SystemStatus: Decodable, Identifiable, Equatable {
     /// password: 사내 아이디·비밀번호 / gh: GitHub CLI 로그인
     public let auth: String?
     public let baseUrl: String?
+    /// 연결 화면에서 묶어 보일 회사 이름 (connections 파일의 company)
+    public let company: String?
     public var id: String { system }
 }
 

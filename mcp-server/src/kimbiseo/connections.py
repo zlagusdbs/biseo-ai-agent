@@ -13,8 +13,10 @@ class SystemDef:
     group: str
     enabled: bool
     base_url: str | None
-    auth: str = "password"   # password: 사내 아이디·비밀번호 / gh: GitHub CLI 로그인
+    auth: str = "password"   # password: 사내 아이디·비밀번호 / gh: GitHub CLI 로그인 / claude.ai: claude.ai 커넥터 (앱이 확인)
     web_url: str | None = None  # 사람이 여는 화면 주소 (API 주소와 다를 때)
+    company: str | None = None  # 연결 화면에서 묶어 보일 회사 이름
+    login_domain: str | None = None  # 로그인 화면에서 고르는 도메인 (Approval)
 
 
 def shared_dir() -> Path:
@@ -35,7 +37,8 @@ def load_systems(path: Path | None = None) -> list[SystemDef]:
     raw = json.loads((path or connections_file()).read_text(encoding="utf-8"))
     return [
         SystemDef(id=s["id"], name=s["name"], group=s["group"], enabled=bool(s["enabled"]), base_url=s.get("baseUrl"),
-                  auth=s.get("auth", "password"), web_url=s.get("webUrl"))
+                  auth=s.get("auth", "password"), web_url=s.get("webUrl"), company=s.get("company"),
+                  login_domain=s.get("loginDomain"))
         for s in raw
     ]
 

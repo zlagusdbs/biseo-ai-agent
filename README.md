@@ -1,6 +1,6 @@
 # 김비서 (kimbiseo-ai-agent)
 
-macOS 메뉴바에 사는 개인 업무 AI 비서. 단축키로 채팅창을 열고 대화하듯 요청하면, Claude 가 사내 시스템(Jira, Wiki, 인사·근태, 배포 관리 Deploy, GitHub Enterprise)과 Microsoft 365(메일·일정·Teams)를 **조회**해서 답한다. 정해 둔 시각에 알아서 보고하고, 내가 리뷰어로 지정된 PR 이 생기면 알려 준다.
+macOS 메뉴바에 사는 개인 업무 AI 비서. 단축키로 채팅창을 열고 대화하듯 요청하면, Claude 가 사내 시스템(Jira, Wiki, 인사·근태, 배포 관리 Deploy, 전자결재 Approval, Permit, GitHub Enterprise)과 Microsoft 365(메일·일정·Teams)를 **조회**해서 답한다. 정해 둔 시각에 알아서 보고하고, 내가 리뷰어로 지정된 PR 이 생기면 알려 준다.
 
 - 대화형 채팅: 앞 대화를 이어서 질문, 이미지 첨부(📎 / ⌘V / 끌어다 놓기)
 - 연결 관리: 사내 계정 한 번 입력으로 여러 시스템 일괄 연동 (비밀번호는 키체인에만 저장)

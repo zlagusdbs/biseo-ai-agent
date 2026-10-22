@@ -51,7 +51,8 @@ def test_password_with_spaces_and_hangul():
 def test_group_ad_skips_disabled():
     code, out = run(["connect", "--group", "ad"], "user\npw\n", {"jira": ok})
     assert code == 0
-    assert {r["system"]: r["status"] for r in out} == {"jira": "connected", "wiki": "unavailable", "hr": "unavailable", "deploy": "unavailable"}
+    assert {r["system"]: r["status"] for r in out} == {"jira": "connected", "wiki": "unavailable", "hr": "unavailable", "deploy": "unavailable",
+                                                       "approval": "unavailable", "permit": "unavailable"}
 
 
 def test_bad_input_returns_2():
@@ -66,7 +67,8 @@ def test_status_reports_states(monkeypatch):
     code, out = run(["status"], verifiers={"jira": ok})
     states = {r["system"]: r["status"] for r in out}
     assert states == {"jira": "expired", "wiki": "unavailable", "hr": "unavailable", "deploy": "unavailable",
-                      "github": "connected", "groupware": "unavailable"}
+                      "approval": "unavailable", "permit": "unavailable", "github": "connected", "microsoft365": "external", "groupware": "unavailable"}
+    assert all(r["company"] for r in out)   # 회사 이름은 connections 파일에 따라 다름
 
 
 def test_tool_not_connected():

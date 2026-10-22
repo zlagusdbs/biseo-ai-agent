@@ -20,7 +20,9 @@ from . import credentials
 from .connections import SystemDef, load_systems
 from .credentials import Credential
 from .errors import AuthExpired, KimbiseoError, NetworkUnreachable
+from .approval_client import ApprovalClient
 from .hr_client import HrClient
+from .permit_client import PermitClient
 from . import github_client
 from .connections import find_system
 from .jira_client import IssueDraft, JiraClient
@@ -35,6 +37,8 @@ VERIFIERS: dict[str, Verifier] = {
     "wiki": lambda system, cred: WikiClient(system.base_url or "", cred).verify(),
     "hr": lambda system, cred: HrClient(system.base_url or "", cred).verify(),
     "deploy": lambda system, cred: DeployClient(system.base_url or "", cred).verify(),
+    "approval": lambda system, cred: ApprovalClient(system.base_url or "", cred, system.login_domain or "").verify(),
+    "permit": lambda system, cred: PermitClient(system.base_url or "", cred).verify(),
 }
 
 MESSAGES = {
@@ -59,6 +63,8 @@ def read_credential(stdin: TextIO) -> Credential | None:
 def connect_one(system: SystemDef, cred: Credential, verifiers: dict[str, Verifier]) -> dict:
     if system.auth == "gh":
         return {"system": system.id, "status": "unavailable", "message": "GitHub 은 연결 화면의 [연결] 로 따로 로그인해요"}
+    if system.auth == "claude.ai":
+        return {"system": system.id, "status": "unavailable", "message": "claude.ai 설정에서 연결해요"}
     verifier = verifiers.get(system.id)
     if not system.enabled or verifier is None:
         status = "unavailable"
@@ -77,6 +83,8 @@ def connect_one(system: SystemDef, cred: Credential, verifiers: dict[str, Verifi
 
 
 def system_status(system: SystemDef, verifiers: dict[str, Verifier]) -> str:
+    if system.auth == "claude.ai":
+        return "external"   # claude.ai 커넥터는 앱이 claude mcp list 로 확인한다
     if system.enabled and system.auth == "gh":
         return "connected" if github_client.is_logged_in(system.base_url or "") else "disconnected"
     if not system.enabled or system.id not in verifiers:
@@ -206,7 +214,7 @@ def main(argv: list[str] | None = None, stdin: TextIO = sys.stdin, stdout: TextI
 
     if args.command == "status":
         out = [{"system": s.id, "name": s.name, "group": s.group, "auth": s.auth, "baseUrl": s.base_url,
-                "status": system_status(s, verifiers)} for s in systems]
+                "company": s.company, "status": system_status(s, verifiers)} for s in systems]
         print(json.dumps(out, ensure_ascii=False), file=stdout)
         return 0
 

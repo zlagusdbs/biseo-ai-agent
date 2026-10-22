@@ -22,7 +22,10 @@ JSON_DATE_RE = re.compile(r"/Date\((-?\d+)")
 
 
 class _LoginFormParser(HTMLParser):
-    """비밀번호 입력칸이 있는 form 의 action 과 hidden 필드를 찾는다."""
+    """비밀번호 입력칸이 있는 form 의 action 과 hidden 필드를 찾는다.
+
+    브라우저처럼 form 안의 form 은 무시한다 (Permit 로그인 화면은 form 이 겹쳐 있고, 바깥 form 으로 제출된다).
+    """
 
     def __init__(self):
         super().__init__()
@@ -32,7 +35,8 @@ class _LoginFormParser(HTMLParser):
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
         if tag == "form":
-            self._current = (a.get("action") or "", {}, [False])
+            if self._current is None:
+                self._current = (a.get("action") or "", {}, [False])
         elif tag == "input" and self._current is not None:
             kind = (a.get("type") or "text").lower()
             if kind == "password":
@@ -69,6 +73,10 @@ def as_date(value) -> str:
 
 
 class HrClient:
+    """Permit 처럼 같은 방식(ASP.NET 폼 로그인)의 사내 시스템은 이 클래스를 이어받아 system·home 만 바꾼다."""
+    system = SYSTEM
+    home = "/"   # 로그인 확인에 쓰는 첫 화면
+
     def __init__(self, base_url: str, cred: Credential, transport: httpx.BaseTransport | None = None):
         self.base_url = base_url.rstrip("/")
         self.cred = cred
@@ -106,30 +114,30 @@ class HrClient:
     # 내부
 
     def _login(self) -> None:
-        page = self._request("GET", "/", login=False)
+        page = self._request("GET", self.home, login=False)
         if not looks_like_login(str(page.url), page.text):
             self._logged_in = True
             return
         form = find_login_form(page.text)
         if form is None:
-            raise KimbiseoError(SYSTEM, "로그인 화면을 찾지 못했어요")
+            raise KimbiseoError(self.system, "로그인 화면을 찾지 못했어요")
         action, fields = form
         fields["UserId"] = self.cred.username
         fields["Password"] = self.cred.secret
         self._request("POST", urljoin(str(page.url), action), data=fields, login=False)
-        check = self._request("GET", "/", login=False)
+        check = self._request("GET", self.home, login=False)
         if looks_like_login(str(check.url), check.text):
-            raise AuthExpired(SYSTEM, "로그인 실패")
+            raise AuthExpired(self.system, "로그인 실패")
         self._logged_in = True
 
     def _call(self, path: str, body: dict, referer_path: str):
         response = self._request("POST", path, json=body, headers={"Referer": self.base_url + referer_path,
                                                                     "X-Requested-With": "XMLHttpRequest"})
         if "json" not in response.headers.get("content-type", ""):
-            raise AuthExpired(SYSTEM, "JSON 이 아닌 응답 (세션 만료)")
+            raise AuthExpired(self.system, "JSON 이 아닌 응답 (세션 만료)")
         data = response.json()
         if not data.get("Success"):
-            raise KimbiseoError(SYSTEM, data.get("Message") or "Success=false")
+            raise KimbiseoError(self.system, data.get("Message") or "Success=false")
         result = data.get("Result")
         if isinstance(result, dict) and result and all(isinstance(v, dict) for v in result.values()):
             return list(result.values())
@@ -141,8 +149,8 @@ class HrClient:
         try:
             response = self._client.request(method, url, **kwargs)
         except httpx.TransportError as e:
-            raise NetworkUnreachable(SYSTEM, str(e)) from e
+            raise NetworkUnreachable(self.system, str(e)) from e
         if response.status_code in (401, 403):
-            raise AuthExpired(SYSTEM, f"HTTP {response.status_code}")
+            raise AuthExpired(self.system, f"HTTP {response.status_code}")
         response.raise_for_status()
         return response
