@@ -62,3 +62,17 @@ def test_nested_form_uses_outer_action_like_browser():
             '<input name="Password" type="password"></form></form>')
     action, fields = find_login_form(page)
     assert action == "/Account/Authenticate" and fields["__RequestVerificationToken"] == "t"
+
+
+def test_portal_current_user_and_auth_error():
+    from unittest.mock import MagicMock
+    from kimbiseo.portal_client import PortalClient
+    ok = MagicMock(); ok.status_code = 200; ok.json.return_value = {"d": {"Title": "홍길동", "Email": "a@example.com"}}
+    session = MagicMock(); session.headers = {}; session.get.return_value = ok
+    assert PortalClient("https://portal.example.com", CRED, session=session).current_user() == {"name": "홍길동", "email": "a@example.com"}
+    assert session.get.call_args.args[0] == "https://portal.example.com/_api/web/currentUser"
+    denied = MagicMock(); denied.status_code = 401
+    session.get.return_value = denied
+    with pytest.raises(AuthExpired) as e:
+        PortalClient("https://portal.example.com", CRED, session=session).verify()
+    assert e.value.code == "AUTH_EXPIRED:portal"

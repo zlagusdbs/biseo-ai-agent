@@ -22,11 +22,11 @@ def issue(n: int) -> dict:
 
 def test_load_systems_reads_shared_file():
     systems = load_systems(shared_dir() / "connections.example.json")
-    assert [s.id for s in systems] == ["jira", "wiki", "hr", "deploy", "approval", "permit", "github", "microsoft365", "groupware"]
-    assert [s.id for s in systems if s.enabled] == ["jira", "wiki", "hr", "deploy", "approval", "permit", "github", "microsoft365"]
+    assert [s.id for s in systems] == ["portal", "jira", "wiki", "hr", "deploy", "approval", "permit", "github", "microsoft365", "groupware"]
+    assert [s.id for s in systems if s.enabled] == ["portal", "jira", "wiki", "hr", "deploy", "approval", "permit", "github", "microsoft365"]
     assert {s.company for s in systems} == {"Company A", "Company B"}
     assert next(s for s in systems if s.id == "groupware").company == "Company B"
-    assert {s.id for s in systems if s.group == "ad"} == {"jira", "wiki", "hr", "deploy", "approval", "permit"}
+    assert {s.id for s in systems if s.group == "ad"} == {"portal", "jira", "wiki", "hr", "deploy", "approval", "permit"}
     assert next(s for s in systems if s.id == "github").auth == "gh"
 
 

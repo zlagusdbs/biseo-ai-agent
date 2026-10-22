@@ -23,6 +23,7 @@ from .errors import AuthExpired, KimbiseoError, NetworkUnreachable
 from .approval_client import ApprovalClient
 from .hr_client import HrClient
 from .permit_client import PermitClient
+from .portal_client import PortalClient
 from . import github_client
 from .connections import find_system
 from .jira_client import IssueDraft, JiraClient
@@ -39,6 +40,7 @@ VERIFIERS: dict[str, Verifier] = {
     "deploy": lambda system, cred: DeployClient(system.base_url or "", cred).verify(),
     "approval": lambda system, cred: ApprovalClient(system.base_url or "", cred, system.login_domain or "").verify(),
     "permit": lambda system, cred: PermitClient(system.base_url or "", cred).verify(),
+    "portal": lambda system, cred: PortalClient(system.base_url or "", cred).verify(),
 }
 
 MESSAGES = {

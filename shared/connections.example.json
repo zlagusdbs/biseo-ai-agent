@@ -1,4 +1,5 @@
 [
+  {"id": "portal", "name": "Portal", "group": "ad", "enabled": true, "baseUrl": "https://portal.example.com", "company": "Company A"},
   {"id": "jira", "name": "Jira", "group": "ad", "enabled": true, "baseUrl": "https://jira.example.com", "company": "Company A"},
   {"id": "wiki", "name": "Wiki", "group": "ad", "enabled": true, "baseUrl": "https://wiki.example.com", "company": "Company A"},
   {"id": "hr", "name": "HR", "group": "ad", "enabled": true, "baseUrl": "https://hr.example.com", "company": "Company A"},
