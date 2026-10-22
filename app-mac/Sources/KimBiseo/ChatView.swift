@@ -134,11 +134,17 @@ struct ChatView: View {
                     Button { add(ImageLoader.chooseFiles()) } label: { Image(systemName: "paperclip").font(.title3) }
                         .buttonStyle(.plain)
                         .help("이미지 첨부 (⌘V 붙여넣기, 끌어다 놓기도 돼요)")
-                    TextField("메시지 입력", text: $input, axis: .vertical)
+                    TextField("메시지 입력 (Shift+Enter 줄바꿈)", text: $input, axis: .vertical)
                         .textFieldStyle(.plain)
                         .lineLimit(1...5)
                         .focused($inputFocused)
                         .onSubmit(send)
+                        // Enter 는 보내기, Shift+Enter 는 줄바꿈
+                        .onKeyPress(.return, phases: .down) { press in
+                            guard press.modifiers.contains(.shift) else { return .ignored }
+                            input.append("\n")
+                            return .handled
+                        }
                     Button(action: send) { Image(systemName: "arrow.up.circle.fill").font(.title2) }
                         .buttonStyle(.plain)
                         .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pending.isEmpty)
