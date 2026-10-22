@@ -107,7 +107,7 @@ public struct JiraDefaults: Codable, Equatable {
 
     /// 사람이 읽는 한 줄. 카드·설정 화면·Claude 안내에 쓴다.
     public func summary(now: Date, calendar: Calendar) -> String {
-        var parts = ["프로젝트 \(project)", "개발 일은 \(devType), 그 외는 \(taskType)"]
+        var parts = ["프로젝트 \(project)", "개발 일은 \(devType), 그 외는 \(taskType)", "담당자 나(연결된 Jira 계정)"]
         if !originalEstimate.isEmpty { parts.append("Original Estimate \(originalEstimate)") }
         parts.append(targetStart == .today ? "Target start 오늘(\(startDate(now: now, calendar: calendar)))" : "Target start 없음")
         parts.append(targetEnd == .yearEnd ? "Target end 올해 마지막 날(\(endDate(now: now, calendar: calendar)))" : "Target end 없음")
@@ -169,6 +169,8 @@ public enum JiraProposal {
         let common = """
             Jira 이슈 등록 요청이면 직접 등록하지 말고(등록 도구 없음, 거절도 하지 않음) 답변 끝에 kimbiseo-jira 블록으로 초안을 붙인다. \
             앱이 확인 카드와 [Jira에 등록] 버튼을 보여 주고, 사용자가 눌러야 등록된다. 오늘은 \(today). \
+            담당자(Assignee)와 보고자는 앱이 등록할 때 연결된 Jira 계정 본인으로 자동으로 넣으므로 블록에 쓰지 않고, \
+            담당자를 못 정한다고 말하지 않는다 (물으면 "담당자는 본인으로 들어가요" 라고 답한다). \
             summary 는 지시 내용을 짧고 명확한 제목으로, description 은 Jira 위키 문법(h3. 제목, * 목록, # 번호)으로 \
             배경·할 일·완료 조건을 보기 좋게 정리한다. 개발 일이면 개발용 유형, 아니면 일반 업무 유형을 고른다. \
             본문은 초안을 한두 줄로 요약하고 "아래 카드에서 확인하고 [Jira에 등록]을 누르면 등록돼요" 로 끝낸다. \
