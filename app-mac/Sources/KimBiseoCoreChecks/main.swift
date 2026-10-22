@@ -5,6 +5,10 @@ import KimBiseoCore
 // 안내 문구 미리 보기: KIMBISEO_PRINT=rule-hint / jira-hint (기본값 없음) / jira-hint-defaults:<프로젝트키>
 if let what = ProcessInfo.processInfo.environment["KIMBISEO_PRINT"] {
     if what == "rule-hint" { print(RuleProposal.hint); exit(0) }
+    if what == "hints" {   // KIMBISEO_TEXT 의 문장에 붙을 안내 전체
+        let text = ProcessInfo.processInfo.environment["KIMBISEO_TEXT"] ?? ""
+        print(ChatHints.for(text, jiraDefaults: JiraDefaults.load(), now: Date(), calendar: .current)); exit(0)
+    }
     if what == "worklog-hint" { print(WorklogProposal.hint(now: Date(), calendar: .current)); exit(0) }
     let defaults = what.hasPrefix("jira-hint-defaults:") ? JiraDefaults(project: String(what.dropFirst(19))) : nil
     print(JiraProposal.hint(defaults: defaults, now: Date(), calendar: .current))
@@ -324,6 +328,15 @@ do {
     var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "Asia/Seoul")!
     let hint = WorklogProposal.hint(now: cal.date(from: DateComponents(year: 2026, month: 10, day: 22))!, calendar: cal)
     check(WorklogProposal.extract(from: hint).drafts.first?.date == "2026-10-22", "worklog: 안내 예시가 읽힘")
+}
+
+// MARK: ChatHints
+do {
+    let now = Date()
+    let both = ChatHints.for("평일 17시 30분에 오늘 HR랑 worklog 맞춰봐 알림 등록해줘", jiraDefaults: nil, now: now, calendar: .current)
+    check(both.contains("kimbiseo-alarm") && both.contains("kimbiseo-worklog") && both.contains("여러 개 붙었다"), "hints: 알림·worklog 둘 다 붙음")
+    check(ChatHints.for("회의 worklog 10-11 기록해줘", jiraDefaults: nil, now: now, calendar: .current).contains("여러 개 붙었다") == false, "hints: 하나면 묶음 안내 없음")
+    check(ChatHints.for("안녕", jiraDefaults: nil, now: now, calendar: .current).isEmpty, "hints: 해당 없으면 안 붙임")
 }
 
 // MARK: AppSettings

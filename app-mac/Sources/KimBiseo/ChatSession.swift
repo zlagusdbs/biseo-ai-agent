@@ -44,15 +44,7 @@ final class ChatSession: ObservableObject {
         guard !trimmed.isEmpty || !images.isEmpty else { return }
         if trimmed.isEmpty { trimmed = "이 이미지를 보고 설명해줘." }
         append(ChatMessage(role: .user, text: text.trimmingCharacters(in: .whitespacesAndNewlines), images: images.map(\.path)))
-        if WorklogProposal.looksLikeRequest(trimmed) {
-            trimmed += WorklogProposal.hint(now: Date(), calendar: .current)
-        } else if JiraProposal.looksLikeRequest(trimmed) {
-            trimmed += JiraProposal.hint(defaults: jiraDefaults(), now: Date(), calendar: .current)
-        } else if AlarmProposal.looksLikeRequest(trimmed) {
-            trimmed += AlarmProposal.hint
-        } else if RuleProposal.looksLikeRequest(trimmed) {
-            trimmed += RuleProposal.hint
-        }
+        trimmed += ChatHints.for(trimmed, jiraDefaults: jiraDefaults(), now: Date(), calendar: .current)
         queue.append(.chat(trimmed, images))
         processNext()
     }
