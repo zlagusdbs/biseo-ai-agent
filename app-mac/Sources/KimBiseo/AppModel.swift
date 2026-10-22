@@ -66,13 +66,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var connectionError: String?
     @Published private(set) var isLoadingSystems = false
 
-    /// Jira 등록 기본값 (이 PC 에만 저장). nil 이면 처음 등록할 때 김비서가 물어본다.
-    @Published var jiraDefaults: JiraDefaults? = JiraDefaults.load() {
-        didSet { JiraDefaults.save(jiraDefaults) }
-    }
-
-    lazy var chat = ChatSession(settings: { [weak self] in self?.settings ?? .default },
-                                jiraDefaults: { [weak self] in self?.jiraDefaults })
+    lazy var chat = ChatSession(settings: { [weak self] in self?.settings ?? .default })
 
     init() {
         let loaded = AppPaths.loadSettings()
