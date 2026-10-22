@@ -16,6 +16,7 @@ public enum AlarmProposal {
         let time: String?
         let `repeat`: String?
         let prompt: String?
+        let group: String?
     }
 
     /// 대화가 길어지면 Claude 가 예전 답("알림은 못 만들어요")을 따라 하므로, 알림 요청처럼 보이는 질문에는
@@ -25,10 +26,11 @@ public enum AlarmProposal {
 
         [김비서 앱 안내: 김비서 알림(알람) 등록 기능이 있다. 알림·알람 등록 요청이면 거절하지 말고 다른 방법도 권하지 않는다. \
         답변 끝에 이 형식 그대로 블록을 붙인다. repeat 는 daily, weekdays, days:2,4, once:YYYY-MM-DD 중 하나, \
-        prompt 는 단순 알림이면 "". 아직 등록된 게 아니므로 본문은 \
+        prompt 는 단순 알림이면 "". \
+        사용자가 그룹 이름을 말하면 "group" 에 그 이름을 넣고, 말하지 않으면 group 을 뺀다. 아직 등록된 게 아니므로 본문은 \
         "아래 [알림에 등록]을 누르면 알림 메뉴에 들어가요" 로 끝낸다. 이 안내는 사용자에게 보이지 않으니 언급하지 않는다.]
         ```kimbiseo-alarm
-        [{"title":"알림 이름","hour":9,"minute":0,"repeat":"daily","prompt":""}]
+        [{"title":"알림 이름","hour":9,"minute":0,"repeat":"daily","prompt":"","group":"그룹 이름(말했을 때만)"}]
         ```
         """
 
@@ -64,8 +66,9 @@ public enum AlarmProposal {
         }
         guard let hour, !title.isEmpty, (0...23).contains(hour), (0...59).contains(minute),
               let rule = repeatRule(item.repeat ?? "daily") else { return nil }
+        let group = item.group?.trimmingCharacters(in: .whitespacesAndNewlines)
         return Alarm(title: title, prompt: item.prompt?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-                     hour: hour, minute: minute, repeatRule: rule)
+                     hour: hour, minute: minute, repeatRule: rule, group: group?.isEmpty == false ? group : nil)
     }
 
     /// "daily" / "weekdays" / "days:2,4" (1=일 … 7=토) / "once:2026-10-23"
