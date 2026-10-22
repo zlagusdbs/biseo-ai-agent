@@ -2,8 +2,9 @@ import Foundation
 import KimBiseoCore
 
 // Xcode 없이 XCTest 를 쓸 수 없어서 만든 검증 프로그램. `swift run KimBiseoCoreChecks`
-// 안내 문구 미리 보기: KIMBISEO_PRINT=jira-hint (기본값 없음) / jira-hint-defaults:<프로젝트키>
+// 안내 문구 미리 보기: KIMBISEO_PRINT=rule-hint / jira-hint (기본값 없음) / jira-hint-defaults:<프로젝트키>
 if let what = ProcessInfo.processInfo.environment["KIMBISEO_PRINT"] {
+    if what == "rule-hint" { print(RuleProposal.hint); exit(0) }
     let defaults = what.hasPrefix("jira-hint-defaults:") ? JiraDefaults(project: String(what.dropFirst(19))) : nil
     print(JiraProposal.hint(defaults: defaults, now: Date(), calendar: .current))
     exit(0)
@@ -275,13 +276,31 @@ do {
     let (text, notes) = RuleProposal.extract(from: reply)
     check(text == "알겠어요." && notes == [RuleNote(file: "jira", text: "제목 앞에 [회의]")], "rules: 제안 읽기 (빈 줄은 버림)")
     check(RuleProposal.extract(from: "```kimbiseo-rule\n{\"file\":\"memory\",\"text\":\"팀은 가격팀\"}\n```").notes.count == 1, "rules: 한 개짜리도 읽음")
-    check(RuleProposal.extract(from: RuleProposal.hint).notes.count == 1, "rules: 안내 예시가 읽힘")
+    check(RuleProposal.extract(from: RuleProposal.hint).notes.count == 2, "rules: 안내 예시가 읽힘")
     check(RuleProposal.looksLikeRequest("앞으로 지라 제목 앞에 [회의] 붙여줘") && !RuleProposal.looksLikeRequest("내 미완료 Jira"), "rules: 요청 판단")
     let old = #"{"repoDir":"/r","claudePath":"/c","uvPath":"/u","reportHour":10,"reportMinute":0}"#
     let oldSettings = try? JSONDecoder().decode(AppSettings.self, from: Data(old.utf8))
     check(oldSettings?.ownerName == "", "rules: 예전 설정은 주인 이름 없음 (처음 인사)")
     check(oldSettings?.notifyMac == true && oldSettings?.notifyPanel == true, "settings: 예전 설정은 알림 둘 다 켜짐")
     try? FileManager.default.removeItem(at: base)
+    let forget = RuleProposal.extract(from: "```kimbiseo-rule\n[{\"file\":\"memory\",\"text\":\"가격팀\",\"forget\":true}]\n```").notes
+    check(forget.count == 1 && forget[0].isForget && forget[0].isMemory, "memory: 잊기 제안 읽기")
+    check(RuleProposal.extract(from: RuleProposal.hint).notes.first?.isMemory == true, "memory: 안내 예시의 기억이 읽힘")
+    check(RuleProposal.looksLikeRequest("그거 잊어줘") && RuleProposal.looksLikeRequest("내 이름 기억하고 있어?"), "memory: 잊기·기억 질문도 안내")
+}
+
+// MARK: Memory (실제 데이터 폴더 대신 임시 폴더를 쓰도록 KIMBISEO 데이터 폴더는 건드리지 않고 파일 단위로 검사)
+do {
+    let backup = try? Data(contentsOf: Memory.file)
+    try? FileManager.default.removeItem(at: Memory.file)
+    try? Memory.add("팀은 가격팀")
+    try? Memory.add("팀은 가격팀")
+    try? Memory.add("화요일 10시 팀 회의")
+    check(Memory.items() == ["팀은 가격팀", "화요일 10시 팀 회의"], "memory: 추가 (같은 건 한 번만)")
+    check((try? Memory.forget("가격팀")) == 1 && Memory.items() == ["화요일 10시 팀 회의"], "memory: 들어간 말로 잊기")
+    check((try? Memory.forget("화요일 10시 팀 회의")) == 1 && Memory.items().isEmpty, "memory: 똑같은 줄 잊기")
+    try? FileManager.default.removeItem(at: Memory.file)
+    if let backup { try? backup.write(to: Memory.file) }
 }
 
 // MARK: AppSettings
