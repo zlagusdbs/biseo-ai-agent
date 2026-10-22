@@ -20,7 +20,15 @@ final class AlarmScheduler {
     func start() {
         model.runAlarmNow = { [weak self] alarm in
             guard let self else { return }
-            if alarm.trigger != nil { Task { await self.triggers.check(alarm) } } else { self.run(alarm) }
+            if alarm.trigger != nil {
+                self.model.markRunning(alarm.id)
+                Task {
+                    let result = await self.triggers.check(alarm)
+                    self.model.markDone(alarm.id, result.message, failed: result.failed)
+                }
+            } else {
+                self.run(alarm)
+            }
         }
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.checkAll() }
@@ -48,22 +56,27 @@ final class AlarmScheduler {
         if alarm.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             notifier.send(title: "🔔 \(alarm.title)", body: "잊지 마세요.")
             reminders.add(title: alarm.title, text: "잊지 마세요: \(alarm.title)", failed: false)
+            model.markDone(alarm.id, "알림 창에 보냈어요")
             return
         }
         guard let prompt = AlarmStore.resolvePrompt(alarm, settings: model.settings) else {
             notifier.send(title: alarm.title, body: "알림 내용을 읽지 못했어요.")
             reminders.add(title: alarm.title, text: "알림 내용을 읽지 못했어요.", failed: true)
+            model.markDone(alarm.id, "알림 내용을 읽지 못했어요", failed: true)
             return
         }
-        model.chat.runReport(title: alarm.title, prompt: prompt) { [notifier, reminders] response in
+        model.markRunning(alarm.id)
+        model.chat.runReport(title: alarm.title, prompt: prompt) { [notifier, reminders, model] response in
             switch response {
             case .success(let text, _):
                 let lines = text.split(separator: "\n", omittingEmptySubsequences: true)
                 notifier.send(title: "🔔 \(alarm.title)", body: lines.prefix(4).joined(separator: "\n"))
                 reminders.add(title: alarm.title, text: text, failed: false)
+                model.markDone(alarm.id, "끝났어요. 결과는 알림 창과 채팅에 있어요")
             case .failure(let failure):
                 notifier.send(title: "🔔 \(alarm.title) 실패", body: failure.message)
                 reminders.add(title: alarm.title, text: failure.message, failed: true)
+                model.markDone(alarm.id, failure.message, failed: true)
             }
         }
     }

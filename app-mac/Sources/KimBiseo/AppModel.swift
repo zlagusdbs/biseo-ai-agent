@@ -38,6 +38,25 @@ final class AppModel: ObservableObject {
     @Published var alarmGroups: [String] {
         didSet { AlarmStore.saveGroups(alarmGroups) }
     }
+    /// 알림 실행 상태. 실행 중이면 목록에 돌아가는 표시를, 끝나면 결과 한 줄을 잠깐 보여 준다.
+    enum AlarmRunState: Equatable {
+        case running
+        case done(String, failed: Bool)
+    }
+    @Published private(set) var alarmRuns: [UUID: AlarmRunState] = [:]
+
+    func markRunning(_ id: UUID) { alarmRuns[id] = .running }
+
+    /// 결과는 6초 보여 주고 지운다.
+    func markDone(_ id: UUID, _ message: String, failed: Bool = false) {
+        let state = AlarmRunState.done(message, failed: failed)
+        alarmRuns[id] = state
+        Task {
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            if alarmRuns[id] == state { alarmRuns[id] = nil }
+        }
+    }
+
     /// 알림을 지금 바로 실행 (AlarmScheduler 가 연결한다).
     var runAlarmNow: (Alarm) -> Void = { _ in }
 
