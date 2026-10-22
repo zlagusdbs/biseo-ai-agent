@@ -281,7 +281,12 @@ do {
     let old = #"{"repoDir":"/r","claudePath":"/c","uvPath":"/u","reportHour":10,"reportMinute":0}"#
     let oldSettings = try? JSONDecoder().decode(AppSettings.self, from: Data(old.utf8))
     check(oldSettings?.ownerName == "", "rules: 예전 설정은 주인 이름 없음 (처음 인사)")
-    check(oldSettings?.notifyMac == true && oldSettings?.notifyPanel == true, "settings: 예전 설정은 알림 둘 다 켜짐")
+    let oldAlarm = #"[{"id":"6F1D6F5E-0000-0000-0000-000000000004","title":"t","prompt":"p","hour":9,"minute":0,"repeatRule":{"daily":{}},"enabled":true}]"#
+    let decodedAlarm = (try? JSONDecoder().decode([Alarm].self, from: Data(oldAlarm.utf8)))?.first
+    check(decodedAlarm?.toMac == true && decodedAlarm?.toPanel == true, "alarm: 예전 알림은 받을 곳 둘 다 켜짐")
+    var quiet = decodedAlarm!; quiet.notifyMac = false
+    let round = (try? JSONEncoder().encode([quiet])).flatMap { try? JSONDecoder().decode([Alarm].self, from: $0) }?.first
+    check(round?.toMac == false && round?.toPanel == true, "alarm: 받을 곳 저장 왕복")
     try? FileManager.default.removeItem(at: base)
     let forget = RuleProposal.extract(from: "```kimbiseo-rule\n[{\"file\":\"memory\",\"text\":\"가격팀\",\"forget\":true}]\n```").notes
     check(forget.count == 1 && forget[0].isForget && forget[0].isMemory, "memory: 잊기 제안 읽기")

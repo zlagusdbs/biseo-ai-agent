@@ -35,6 +35,14 @@ public struct Alarm: Identifiable, Codable, Equatable {
     public var trigger: Trigger?
     /// 알림 그룹 이름. nil 이면 "그룹 없음".
     public var group: String?
+    /// 받을 곳. nil 이면 켜짐 (예전 알림 파일 호환)
+    public var notifyMac: Bool?
+    public var notifyPanel: Bool?
+
+    /// Mac 알림(알림 센터 배너)으로 받을지
+    public var toMac: Bool { notifyMac ?? true }
+    /// 미리 알림 창(화면 오른쪽 아래 카드)으로 받을지
+    public var toPanel: Bool { notifyPanel ?? true }
 
     public init(id: UUID = UUID(), title: String, prompt: String, hour: Int, minute: Int,
                 repeatRule: Repeat, enabled: Bool = true, lastRunDay: String? = nil, trigger: Trigger? = nil,

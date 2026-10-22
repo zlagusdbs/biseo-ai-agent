@@ -15,9 +15,6 @@ public struct AppSettings: Codable, Equatable {
     public var separateClaudeLogin = false
     /// 주인(사용자) 이름. 비어 있으면 처음 사용으로 보고 채팅창에서 이름을 묻는다.
     public var ownerName = ""
-    /// 알림을 받을 곳: Mac 알림(알림 센터 배너), 미리 알림 창(화면 오른쪽 아래 카드)
-    public var notifyMac = true
-    public var notifyPanel = true
 
     public static let defaultAssistantName = "김비서"
 
@@ -56,8 +53,6 @@ public struct AppSettings: Codable, Equatable {
         hotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey) ?? .default
         separateClaudeLogin = try c.decodeIfPresent(Bool.self, forKey: .separateClaudeLogin) ?? false
         ownerName = try c.decodeIfPresent(String.self, forKey: .ownerName) ?? ""
-        notifyMac = try c.decodeIfPresent(Bool.self, forKey: .notifyMac) ?? true
-        notifyPanel = try c.decodeIfPresent(Bool.self, forKey: .notifyPanel) ?? true
     }
 }
 
