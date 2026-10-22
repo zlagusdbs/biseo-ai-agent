@@ -44,7 +44,9 @@ final class ChatSession: ObservableObject {
         guard !trimmed.isEmpty || !images.isEmpty else { return }
         if trimmed.isEmpty { trimmed = "이 이미지를 보고 설명해줘." }
         append(ChatMessage(role: .user, text: text.trimmingCharacters(in: .whitespacesAndNewlines), images: images.map(\.path)))
-        if JiraProposal.looksLikeRequest(trimmed) {
+        if WorklogProposal.looksLikeRequest(trimmed) {
+            trimmed += WorklogProposal.hint(now: Date(), calendar: .current)
+        } else if JiraProposal.looksLikeRequest(trimmed) {
             trimmed += JiraProposal.hint(defaults: jiraDefaults(), now: Date(), calendar: .current)
         } else if AlarmProposal.looksLikeRequest(trimmed) {
             trimmed += AlarmProposal.hint
@@ -118,9 +120,11 @@ final class ChatSession: ObservableObject {
             if !newSession.isEmpty { sessionId = newSession }
             let (afterAlarms, alarms) = AlarmProposal.extract(from: text)
             let (afterJira, jira, defaults) = JiraProposal.extract(from: afterAlarms)
-            let (clean, rules) = RuleProposal.extract(from: afterJira)
+            let (afterRules, rules) = RuleProposal.extract(from: afterJira)
+            let (clean, worklogs) = WorklogProposal.extract(from: afterRules)
             var message = ChatMessage(role: .assistant, text: clean, alarms: alarms, jira: jira, jiraDefaults: defaults)
             message.rules = rules
+            message.worklogs = worklogs
             append(message)
         case .failure(let failure):
             append(ChatMessage(role: .error, text: failure.message))
