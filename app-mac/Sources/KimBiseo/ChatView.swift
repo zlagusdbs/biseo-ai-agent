@@ -46,7 +46,9 @@ struct ChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        if chat.messages.isEmpty {
+                        if model.settings.ownerName.isEmpty {
+                            OnboardingCard(model: model, chat: chat)
+                        } else if chat.messages.isEmpty {
                             Text("무엇이든 물어보세요. 예: 내 미완료 Jira 알려줘")
                                 .foregroundStyle(.secondary)
                                 .padding(.top, 40)
@@ -63,6 +65,12 @@ struct ChatView: View {
                                                   registered: message.alarms.allSatisfy { a in model.alarms.contains { $0.id == a.id } },
                                                   register: { model.register(message.alarms) },
                                                   open: { model.selected = .alarms })
+                            }
+                            if !message.rules.isEmpty {
+                                RuleProposalCard(notes: message.rules, saved: message.rulesSaved) {
+                                    for note in message.rules { try? Rules.append(note.text, to: note.file) }
+                                    chat.update(message.id) { $0.rulesSaved = true }
+                                }
                             }
                             if let draft = message.jira {
                                 JiraDraftCard(model: model, chat: chat, messageID: message.id, draft: draft,
@@ -376,7 +384,7 @@ private struct JiraDraftEditor: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Jira 이슈 수정").font(.headline)
             Form {
-                field("프로젝트 키", $draft.project, "예: PRICING")
+                field("프로젝트 키", $draft.project, "예: MYPROJ")
                 field("이슈 유형", $draft.issueType, "예: Story, Task")
                 field("제목", $draft.summary, "")
                 VStack(alignment: .leading, spacing: 4) {
@@ -387,7 +395,7 @@ private struct JiraDraftEditor: View {
                 field("Original Estimate", $draft.originalEstimate, "예: 365d, 2w, 4h")
                 field("Target start", $draft.targetStart, "yyyy-MM-dd, 비우면 안 넣음")
                 field("Target end", $draft.targetEnd, "yyyy-MM-dd, 비우면 안 넣음")
-                field("Epic Link", $draft.epicLink, "예: PRICING-100, 비우면 안 넣음")
+                field("Epic Link", $draft.epicLink, "예: MYPROJ-100, 비우면 안 넣음")
             }
             .formStyle(.grouped)
             HStack {
@@ -407,6 +415,83 @@ private struct JiraDraftEditor: View {
             Text(title).font(.caption).foregroundStyle(.secondary)
             TextField("", text: text, prompt: Text(hint)).textFieldStyle(.roundedBorder).labelsHidden()
         }
+    }
+}
+
+/// 처음 사용: 주인 이름을 묻고 인사한다. Claude 를 부르지 않는다.
+private struct OnboardingCard: View {
+    @ObservedObject var model: AppModel
+    let chat: ChatSession
+    @State private var name = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("👋 안녕하세요! 저는 \(model.settings.assistantName)예요.").font(.headline)
+            Text("앞으로 Jira, Wiki, 근무일정, 배포, 메일 같은 업무를 같이 챙겨 드릴게요.\n먼저, 주인님 이름이 어떻게 되세요?")
+            HStack {
+                TextField("", text: $name, prompt: Text("이름. 예: 홍길동"))
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focused)
+                    .onSubmit(save)
+                Button("반가워요", action: save)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(12)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.4)))
+        .onAppear { focused = true }
+    }
+
+    private func save() {
+        let owner = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !owner.isEmpty else { return }
+        model.settings.ownerName = String(owner.prefix(20))
+        chat.say("""
+            반가워요, \(model.settings.ownerName)님! 🙌 앞으로 잘 부탁드려요.
+
+            **먼저 해 주세요**
+            - 오른쪽 🔌 연결 → [일괄 연동] 으로 사내 계정을 연결해 주세요. 그래야 Jira·Wiki·근무일정을 볼 수 있어요.
+
+            **이렇게 말해 보세요**
+            - 내 미완료 Jira 알려줘
+            - 평일 9시에 이번 주 근무일정 알려줘 (알림 등록)
+            - 지라 등록해줘: 쿠폰 API 응답 필드 추가 (처음엔 기본값을 여쭤봐요)
+            - 앞으로 지라 제목 앞에 [회의] 붙여줘 (규칙으로 기억)
+            """)
+    }
+}
+
+/// 답변이 제안한 규칙. [규칙에 저장]을 눌러야 이 Mac 의 규칙 파일에 들어간다.
+private struct RuleProposalCard: View {
+    let notes: [RuleNote]
+    let saved: Bool
+    let save: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("규칙 \(notes.count)개", systemImage: "pin").font(.callout.weight(.medium))
+            ForEach(notes, id: \.self) { note in
+                HStack(alignment: .top, spacing: 6) {
+                    Text("\(note.file).md").font(.caption.monospaced()).foregroundStyle(.secondary)
+                    Text(note.text).font(.callout)
+                }
+            }
+            HStack {
+                if saved {
+                    Label("저장했어요. 다음 대화부터 늘 적용돼요", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Button("폴더 열기") { NSWorkspace.shared.open(Rules.myDir) }.buttonStyle(.link)
+                } else {
+                    Button("규칙에 저장", action: save).buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(.top, 2)
+        }
+        .padding(10)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.4)))
     }
 }
 

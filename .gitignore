@@ -8,6 +8,8 @@ build/
 
 # 회사 주소 (예시: shared/connections.example.json)
 shared/connections.local.json
+# 팀·회사 규칙 (예시: shared/rules/*.example.md)
+shared/rules/*.local.md
 # 사내 정보가 담긴 작업 문서
 docs/specs/
 docs/plans/

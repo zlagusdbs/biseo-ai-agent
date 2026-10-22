@@ -15,6 +15,9 @@ public struct ChatMessage: Identifiable, Codable, Equatable {
     public var jira: JiraDraft?
     public var jiraDefaults: JiraDefaults?
     public var jiraCreated: JiraCreated?
+    /// 답변이 제안한 규칙과 저장 여부
+    public var rules: [RuleNote] = []
+    public var rulesSaved = false
 
     public init(id: UUID = UUID(), role: Role, text: String, date: Date = Date(), images: [String] = [], alarms: [Alarm] = [],
                 jira: JiraDraft? = nil, jiraDefaults: JiraDefaults? = nil) {
@@ -40,6 +43,8 @@ public struct ChatMessage: Identifiable, Codable, Equatable {
         jira = try c.decodeIfPresent(JiraDraft.self, forKey: .jira)
         jiraDefaults = try c.decodeIfPresent(JiraDefaults.self, forKey: .jiraDefaults)
         jiraCreated = try c.decodeIfPresent(JiraCreated.self, forKey: .jiraCreated)
+        rules = try c.decodeIfPresent([RuleNote].self, forKey: .rules) ?? []
+        rulesSaved = try c.decodeIfPresent(Bool.self, forKey: .rulesSaved) ?? false
     }
 }
 
