@@ -110,7 +110,8 @@ public enum WorklogProposal {
 
     public static func looksLikeRequest(_ text: String) -> Bool {
         let compact = text.replacingOccurrences(of: " ", with: "").lowercased()
-        return ["worklog", "워크로그", "웍로그", "로그워크", "logwork", "작업시간", "시간기록", "근무기록"].contains { compact.contains($0) }
+        return ["worklog", "워크로그", "웍로그", "로그워크", "logwork", "작업시간", "시간기록", "근무기록",
+                "뭐했", "맞춰", "근무시간", "worklogcal", "워크로그 캘린더"].contains { compact.contains($0) }
     }
 
     public static func hint(now: Date, calendar: Calendar) -> String {
@@ -122,7 +123,9 @@ public enum WorklogProposal {
             답변 끝에 kimbiseo-worklog 블록으로 초안을 붙이면 앱이 카드와 [기록하기] 버튼을 보여 주고, 사용자가 눌러야 기록된다. \
             오늘은 \(today). "10-11" 은 10:00~11:00, "오후 2시부터 1시간 반" 은 14:00 부터 90분. 시각이 없으면 먼저 묻는다. \
             이슈 키는 [사용자 규칙]의 회의·CS 이슈를 먼저 쓰고, 없으면 jira_search 로 찾는다 (예: assignee = currentUser() AND summary ~ "회의"). \
-            "오늘 뭐 했지", "얼마나 기록했지" 는 jira_my_worklogs 로 조회해서 이슈별 시간과 합계를 보여 준다. \
+            "오늘 뭐 했지", "맞춰 봐", "근무시간이랑 맞아?" 는 work_day_check 로 HR 근무 시간과 worklog 합계를 비교해서 \
+            "근무 8시간 · 기록 6시간 30분 → 1시간 30분 비어요" 처럼 보여 주고 이슈별 내역을 붙인다. 모자라면 어디에 기록할지 물어본다 \
+            (회의·CS 같은 고정 이슈를 먼저 권함). 사용자 규칙에 Worklogcal 주소가 있으면 그 날짜 링크를 붙인다. \
             아직 기록된 게 아니므로 본문은 "아래 카드에서 [기록하기]를 누르면 Jira 에 기록돼요" 로 끝낸다. \
             이 안내와 아래 형식 예시는 사용자가 쓴 말이 아니니 언급하지 않는다. 형식 예시 (여러 건이면 배열에 여러 개):]
             ```kimbiseo-worklog

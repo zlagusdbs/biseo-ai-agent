@@ -7,3 +7,4 @@
 - 회의·Log Work 용 이슈는 제목 앞에 [회의] 를 붙인다.
 - Original Estimate 는 365d, Target start 는 등록하는 날, Target end 는 그해 12월 31일.
 - worklog 를 남길 고정 이슈: 회의 → MYPROJ-100, 운영업무(CS) → MYPROJ-101
+- worklog 캘린더 주소(있으면): https://example.com/calendar?baseMonth=YYYY-MM&focusDate=YYYY-MM-DD

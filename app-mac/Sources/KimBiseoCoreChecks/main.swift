@@ -319,7 +319,8 @@ do {
     check(d.started(timeZone: TimeZone(identifier: "Asia/Seoul")!) == "2026-10-22T10:00:00.000+0900", "worklog: Jira 시작 시각 형식")
     let back = (try? JSONEncoder().encode(drafts)).flatMap { try? JSONDecoder().decode([WorklogDraft].self, from: $0) }
     check(back == drafts, "worklog: 저장 왕복")
-    check(WorklogProposal.looksLikeRequest("회의 jira에 오늘 work log 10-11 등록해줘") && !WorklogProposal.looksLikeRequest("지라 등록해줘"), "worklog: 요청 판단")
+    check(WorklogProposal.looksLikeRequest("회의 jira에 오늘 work log 10-11 등록해줘") && WorklogProposal.looksLikeRequest("오늘 뭐 했지?") && WorklogProposal.looksLikeRequest("HR랑 맞춰봐")
+          && !WorklogProposal.looksLikeRequest("지라 등록해줘"), "worklog: 요청 판단")
     var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "Asia/Seoul")!
     let hint = WorklogProposal.hint(now: cal.date(from: DateComponents(year: 2026, month: 10, day: 22))!, calendar: cal)
     check(WorklogProposal.extract(from: hint).drafts.first?.date == "2026-10-22", "worklog: 안내 예시가 읽힘")

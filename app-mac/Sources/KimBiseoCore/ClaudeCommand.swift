@@ -6,6 +6,7 @@ public enum ClaudeCommand {
         "mcp__kimbiseo__jira_search",
         "mcp__kimbiseo__jira_projects",
         "mcp__kimbiseo__jira_my_worklogs",
+        "mcp__kimbiseo__work_day_check",
         "mcp__kimbiseo__wiki_search",
         "mcp__kimbiseo__wiki_get_page",
         "mcp__kimbiseo__hr_holidays",
