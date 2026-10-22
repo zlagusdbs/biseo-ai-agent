@@ -10,6 +10,7 @@ struct SettingsView: View {
             Section("단축키") {
                 HotkeyRecorder(hotkey: $model.settings.hotkey)
             }
+            ClaudeAccountSection(model: model)
             JiraDefaultsSection(defaults: $model.jiraDefaults)
             Section("경로") {
                 TextField("김비서 저장소", text: $model.settings.repoDir)
@@ -116,5 +117,66 @@ private struct JiraDefaultsSection: View {
         } footer: {
             Text("이 Mac 에만 저장돼요. 담당자는 항상 연결된 Jira 계정 본인이에요.").font(.caption).foregroundStyle(.secondary)
         }
+    }
+}
+
+/// 김비서가 쓰는 Claude 계정. 전용 로그인을 켜면 터미널 Claude Code 와 다른 계정(예: 팀 플랜)으로 쓸 수 있다.
+private struct ClaudeAccountSection: View {
+    @ObservedObject var model: AppModel
+    @State private var account: ClaudeAccount?
+    @State private var loading = false
+
+    var body: some View {
+        Section {
+            Toggle(isOn: Binding(get: { model.settings.separateClaudeLogin }, set: { on in
+                model.settings.separateClaudeLogin = on
+                model.chat.forgetSession()
+                Task { await refresh() }
+            })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("김비서 전용 로그인 쓰기")
+                    Text(model.settings.separateClaudeLogin
+                         ? "김비서만 따로 로그인해요. 터미널 Claude Code 로그인은 그대로예요."
+                         : "지금은 터미널 Claude Code 와 같은 로그인을 같이 써요.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            HStack {
+                Text("연결된 계정")
+                Spacer()
+                if loading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Text(account?.display ?? "claude 를 찾지 못했어요").foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+            }
+            if model.settings.separateClaudeLogin {
+                HStack {
+                    Button(account?.loggedIn == true ? "다른 계정으로 로그인" : "로그인") {
+                        Task {
+                            if account?.loggedIn == true { await ClaudeLogin.logout(settings: model.settings) }
+                            model.selected = .chat
+                            model.chat.startLogin(retry: nil)
+                        }
+                    }
+                    if account?.loggedIn == true {
+                        Button("로그아웃") { Task { await ClaudeLogin.logout(settings: model.settings); await refresh() } }
+                    }
+                }
+            }
+        } header: {
+            Text("김비서 Claude 계정")
+        } footer: {
+            Text("로그인할 때 브라우저에서 쓸 조직(회사 Enterprise, 팀 플랜 등)을 고를 수 있어요. 사내 데이터를 어느 조직으로 보내도 되는지는 회사 기준을 따라 주세요. Microsoft 365 커넥터는 로그인한 계정의 claude.ai 설정에서 따로 연결해야 해요.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .task { await refresh() }
+        .onChange(of: model.chat.loginState) { if model.chat.loginState == .idle { Task { await refresh() } } }
+    }
+
+    private func refresh() async {
+        loading = true
+        account = await ClaudeLogin.account(settings: model.settings)
+        loading = false
     }
 }

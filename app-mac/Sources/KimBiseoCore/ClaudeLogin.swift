@@ -18,13 +18,24 @@ public final class ClaudeLogin: @unchecked Sendable {
     public init() {}
 
     public static func isLoggedIn(settings: AppSettings) async -> Bool {
+        await account(settings: settings)?.loggedIn ?? false
+    }
+
+    /// 김비서가 지금 쓰는 Claude 계정 (`claude auth status`). claude 를 못 찾으면 nil.
+    public static func account(settings: AppSettings) async -> ClaudeAccount? {
         guard FileManager.default.isExecutableFile(atPath: settings.claudePath),
               let out = try? await ProcessRunner().run(executable: settings.claudePath, arguments: ["auth", "status"],
                                                        environment: AppPaths.processEnvironment(settings: settings),
-                                                       timeout: 20),
-              let json = try? JSONSerialization.jsonObject(with: out.stdout) as? [String: Any]
-        else { return false }
-        return json["loggedIn"] as? Bool ?? false
+                                                       timeout: 20)
+        else { return nil }
+        return ClaudeAccount.parse(out.stdout)
+    }
+
+    /// 로그아웃. 김비서 전용 로그인일 때만 부른다 (공유 로그인이면 터미널 Claude Code 도 로그아웃되므로).
+    public static func logout(settings: AppSettings) async {
+        guard settings.separateClaudeLogin else { return }
+        _ = try? await ProcessRunner().run(executable: settings.claudePath, arguments: ["auth", "logout"],
+                                           environment: AppPaths.processEnvironment(settings: settings), timeout: 20)
     }
 
     /// 로그인 시작. onEvent 는 메인 스레드에서 불린다.
@@ -84,5 +95,33 @@ public final class ClaudeLogin: @unchecked Sendable {
         if let process, process.isRunning { process.terminate() }
         process = nil
         input = nil
+    }
+}
+
+/// `claude auth status` 결과.
+public struct ClaudeAccount: Equatable {
+    public let loggedIn: Bool
+    public let email: String
+    public let orgName: String
+    public let plan: String       // enterprise, team, max, pro …
+
+    public init(loggedIn: Bool, email: String, orgName: String, plan: String) {
+        self.loggedIn = loggedIn
+        self.email = email
+        self.orgName = orgName
+        self.plan = plan
+    }
+
+    public static func parse(_ data: Data) -> ClaudeAccount? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return ClaudeAccount(loggedIn: json["loggedIn"] as? Bool ?? false, email: json["email"] as? String ?? "",
+                             orgName: json["orgName"] as? String ?? "", plan: json["subscriptionType"] as? String ?? "")
+    }
+
+    /// 예: "kim@example.com · Example Inc. (enterprise)"
+    public var display: String {
+        guard loggedIn else { return "로그인 안 됨" }
+        let org = orgName.isEmpty ? "" : " · \(orgName)"
+        return email + org + (plan.isEmpty ? "" : " (\(plan))")
     }
 }

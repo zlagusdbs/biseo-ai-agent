@@ -13,7 +13,7 @@ public enum ClaudeFailure: Equatable {
         switch self {
         case .notInstalled: return "Claude Code 설치가 필요해요."
         case .notLoggedIn: return "로그인이 필요합니다. 브라우저를 띄웁니다."
-        case .usageLimit: return "Claude 사용 한도에 도달했어요."
+        case .usageLimit: return "Claude 사용 한도를 다 썼어요. 관리자에게 한도를 올려 달라고 요청하거나(터미널 claude 에서 /usage-credits), ⚙️ 설정의 「김비서 Claude 계정」에서 다른 계정으로 로그인해 주세요."
         case .timeout: return "응답이 늦어요. 다시 시도해 주세요."
         case .cancelled: return "취소했어요."
         case .malformed(let text): return "응답을 읽지 못했어요: \(text.prefix(200))"
@@ -58,7 +58,8 @@ public enum ClaudeResponse: Equatable {
         if lower.contains("authenticate") || lower.contains("/login") || lower.contains("not logged in") {
             return .notLoggedIn
         }
-        if lower.contains("usage limit") || lower.contains("rate limit") || lower.contains("limit reached") {
+        if lower.contains("usage limit") || lower.contains("rate limit") || lower.contains("limit reached")
+            || lower.contains("spend limit") || lower.contains("usage-credits") {
             return .usageLimit
         }
         return nil

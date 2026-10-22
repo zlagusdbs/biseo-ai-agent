@@ -11,6 +11,8 @@ public struct AppSettings: Codable, Equatable {
     public var reportMinute: Int
     public var lastReportDay: String?
     public var hotkey: Hotkey = .default
+    /// true 면 김비서만 따로 Claude 에 로그인한다 (터미널 Claude Code 로그인과 분리, 다른 조직·플랜 사용 가능).
+    public var separateClaudeLogin = false
 
     public static let defaultAssistantName = "김비서"
 
@@ -47,6 +49,7 @@ public struct AppSettings: Codable, Equatable {
         reportMinute = try c.decodeIfPresent(Int.self, forKey: .reportMinute) ?? d.reportMinute
         lastReportDay = try c.decodeIfPresent(String.self, forKey: .lastReportDay)
         hotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey) ?? .default
+        separateClaudeLogin = try c.decodeIfPresent(Bool.self, forKey: .separateClaudeLogin) ?? false
     }
 }
 
@@ -56,6 +59,8 @@ public enum AppPaths {
         return base.appendingPathComponent("kim-biseo", isDirectory: true)
     }
     public static var workDir: URL { dataDir.appendingPathComponent("work", isDirectory: true) }
+    /// 김비서 전용 Claude 로그인 정보가 들어가는 폴더 (separateClaudeLogin 일 때).
+    public static var claudeConfigDir: URL { dataDir.appendingPathComponent("claude-config", isDirectory: true) }
     public static var mcpConfig: URL { dataDir.appendingPathComponent("mcp-config.json") }
     public static var settingsFile: URL { dataDir.appendingPathComponent("settings.json") }
     public static var chatFile: URL { dataDir.appendingPathComponent("chat.json") }
@@ -96,6 +101,12 @@ public enum AppPaths {
             "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin",
         ]
         env["PATH"] = (extra + [env["PATH"] ?? ""]).filter { !$0.isEmpty }.joined(separator: ":")
+        if settings.separateClaudeLogin {
+            try? FileManager.default.createDirectory(at: claudeConfigDir, withIntermediateDirectories: true)
+            env["CLAUDE_CONFIG_DIR"] = claudeConfigDir.path
+        } else {
+            env.removeValue(forKey: "CLAUDE_CONFIG_DIR")
+        }
         return env
     }
 }

@@ -241,6 +241,19 @@ do {
     check(back?.jira == draft && back?.jiraCreated?.key == "PRICING-1", "jira: 대화 기록에 초안·결과 저장")
 }
 
+// MARK: ClaudeAccount
+do {
+    let status = #"{"loggedIn":true,"email":"kim@example.com","orgName":"Example Inc.","subscriptionType":"team"}"#
+    check(ClaudeAccount.parse(Data(status.utf8))?.display == "kim@example.com · Example Inc. (team)", "account: 표시")
+    check(ClaudeAccount.parse(Data(#"{"loggedIn":false}"#.utf8))?.display == "로그인 안 됨", "account: 로그인 안 됨")
+    let limit = #"{"type":"result","is_error":true,"result":"You've hit your individual spend limit · run /usage-credits to ask your admin for a higher limit"}"#
+    check(ClaudeResponse.parse(stdout: Data(limit.utf8), exitCode: 1) == .failure(.usageLimit), "account: 개인 사용 한도 오류")
+    var s = AppSettings.default
+    check(AppPaths.processEnvironment(settings: s)["CLAUDE_CONFIG_DIR"] == nil, "account: 기본은 공유 로그인")
+    s.separateClaudeLogin = true
+    check(AppPaths.processEnvironment(settings: s)["CLAUDE_CONFIG_DIR"] == AppPaths.claudeConfigDir.path, "account: 전용 로그인은 따로 폴더")
+}
+
 // MARK: AppSettings
 do {
     let old = #"{"repoDir":"/r","claudePath":"/c","uvPath":"/u","reportHour":10,"reportMinute":0,"lastReportDay":"2026-10-21"}"#

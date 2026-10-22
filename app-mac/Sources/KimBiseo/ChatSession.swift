@@ -71,6 +71,12 @@ final class ChatSession: ObservableObject {
         runner.cancel()
     }
 
+    /// 계정이 바뀌면 이전 세션을 이어 쓸 수 없어서 세션만 잊는다 (화면의 대화는 남김).
+    func forgetSession() {
+        sessionId = nil
+        save()
+    }
+
     func newConversation() {
         cancel()
         messages = []
@@ -111,7 +117,7 @@ final class ChatSession: ObservableObject {
             lastFailedImages = images
             if failure == .notLoggedIn {
                 startLogin(retry: prompt)
-            } else if failure != .cancelled {
+            } else if failure != .cancelled && failure != .usageLimit {   // 한도는 다시 시도해도 같아서 버튼을 숨긴다
                 lastFailedPrompt = prompt
             }
         }
