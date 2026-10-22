@@ -133,19 +133,6 @@ private struct ClaudeAccountSection: View {
 
     var body: some View {
         Section {
-            Toggle(isOn: Binding(get: { model.settings.separateClaudeLogin }, set: { on in
-                model.settings.separateClaudeLogin = on
-                model.chat.forgetSession()
-                Task { await refresh() }
-            })) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("김비서 전용 로그인 쓰기")
-                    Text(model.settings.separateClaudeLogin
-                         ? "김비서만 따로 로그인해요. 터미널 Claude Code 로그인은 그대로예요."
-                         : "지금은 터미널 Claude Code 와 같은 로그인을 같이 써요.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
             HStack {
                 Text("연결된 계정")
                 Spacer()
@@ -155,24 +142,23 @@ private struct ClaudeAccountSection: View {
                     Text(account?.display ?? "claude 를 찾지 못했어요").foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
             }
-            if model.settings.separateClaudeLogin {
-                HStack {
-                    Button(account?.loggedIn == true ? "다른 계정으로 로그인" : "로그인") {
-                        Task {
-                            if account?.loggedIn == true { await ClaudeLogin.logout(settings: model.settings) }
-                            model.selected = .chat
-                            model.chat.startLogin(retry: nil)
-                        }
+            HStack {
+                Button(account?.loggedIn == true ? "다른 계정으로 로그인" : "로그인") {
+                    Task {
+                        if account?.loggedIn == true { await ClaudeLogin.logout(settings: model.settings) }
+                        model.chat.forgetSession()
+                        model.selected = .chat
+                        model.chat.startLogin(retry: nil)
                     }
-                    if account?.loggedIn == true {
-                        Button("로그아웃") { Task { await ClaudeLogin.logout(settings: model.settings); await refresh() } }
-                    }
+                }
+                if account?.loggedIn == true {
+                    Button("로그아웃") { Task { await ClaudeLogin.logout(settings: model.settings); await refresh() } }
                 }
             }
         } header: {
             Text("김비서 Claude 계정")
         } footer: {
-            Text("로그인할 때 브라우저에서 쓸 조직(회사 Enterprise, 팀 플랜 등)을 고를 수 있어요. 사내 데이터를 어느 조직으로 보내도 되는지는 회사 기준을 따라 주세요. Microsoft 365 커넥터는 로그인한 계정의 claude.ai 설정에서 따로 연결해야 해요.")
+            Text("김비서는 터미널 Claude Code 와 따로 로그인해요. 로그인할 때 브라우저에서 쓸 조직(팀 플랜 등)을 고를 수 있어요. 사내 데이터를 어느 조직으로 보내도 되는지는 회사 기준을 따라 주세요. Microsoft 365 커넥터는 로그인한 계정의 claude.ai 설정에서 따로 연결해야 해요.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .task { await refresh() }
