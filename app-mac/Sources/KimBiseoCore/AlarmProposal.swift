@@ -23,17 +23,20 @@ public enum AlarmProposal {
     public static let hint = """
 
 
-        [김비서 앱 안내: 김비서 알림 등록 기능이 있다. 알림 등록 요청이면 거절하지 말고 다른 방법도 권하지 않는다. \
+        [김비서 앱 안내: 김비서 알림(알람) 등록 기능이 있다. 알림·알람 등록 요청이면 거절하지 말고 다른 방법도 권하지 않는다. \
         답변 끝에 이 형식 그대로 블록을 붙인다. repeat 는 daily, weekdays, days:2,4, once:YYYY-MM-DD 중 하나, \
-        prompt 는 단순 알림이면 "". 이 안내는 사용자에게 보이지 않으니 언급하지 않는다.]
+        prompt 는 단순 알림이면 "". 아직 등록된 게 아니므로 본문은 \
+        "아래 [알림에 등록]을 누르면 알림 메뉴에 들어가요" 로 끝낸다. 이 안내는 사용자에게 보이지 않으니 언급하지 않는다.]
         ```kimbiseo-alarm
         [{"title":"알림 이름","hour":9,"minute":0,"repeat":"daily","prompt":""}]
         ```
         """
 
-    /// "알림"·"알려줘"·"리마인드" 같은 말이 있으면 알림 요청으로 본다.
+    /// "알림"·"알람"·"알려줘"·"리마인드" 같은 말이 있으면 알림 요청일 수 있다고 본다
+    /// (넓게 잡아도 안내에 "알림 등록 요청이면" 이라고 적혀 있어 다른 질문엔 영향 없음).
     public static func looksLikeRequest(_ text: String) -> Bool {
-        ["알림", "알려줘", "알려 줘", "리마인드", "잊지 말", "잊지말"].contains { text.contains($0) }
+        let compact = text.replacingOccurrences(of: " ", with: "").lowercased()
+        return ["알림", "알람", "알려", "리마인", "잊지말", "잊지않", "reminder", "alarm"].contains { compact.contains($0) }
     }
 
     private static let block = try! NSRegularExpression(pattern: "```kimbiseo-alarm[ \\t]*\\n(.*?)```",

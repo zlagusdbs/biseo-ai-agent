@@ -173,7 +173,9 @@ do {
           && AlarmProposal.repeatRule("days:9") == nil && AlarmProposal.repeatRule("hourly") == nil, "proposal: 반복 규칙")
     let loose = AlarmProposal.extract(from: "```kimbiseo-alarm\n[{\"time\":\"18:30\",\"repeat\":\"daily\",\"message\":\"m\"}]\n```").alarms
     check(loose.count == 1 && loose[0].hour == 18 && loose[0].minute == 30 && loose[0].title == "m", "proposal: time·message 키도 받음")
-    check(AlarmProposal.looksLikeRequest("매일 9시에 잊지말라고 알림 기록해줘") && !AlarmProposal.looksLikeRequest("내 미완료 Jira"), "proposal: 알림 요청 판단")
+    check(AlarmProposal.looksLikeRequest("매일 9시에 잊지말라고 알림 기록해줘") && AlarmProposal.looksLikeRequest("매일 오전 9시에 1:1 알람을 해야 한다고 알람설정해줘")
+          && AlarmProposal.looksLikeRequest("잊지 않게 리마인드 해줘")
+          && !AlarmProposal.looksLikeRequest("내 미완료 Jira"), "proposal: 알림 요청 판단 (알람도)")
     check(AlarmProposal.extract(from: AlarmProposal.hint).alarms.count == 1, "proposal: 안내 속 예시 형식이 실제로 읽힘")
     let msg = ChatMessage(role: .assistant, text: "t", alarms: alarms)
     let back = (try? JSONEncoder().encode(msg)).flatMap { try? JSONDecoder().decode(ChatMessage.self, from: $0) }
