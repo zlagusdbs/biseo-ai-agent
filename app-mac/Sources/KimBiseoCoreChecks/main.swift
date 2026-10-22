@@ -255,19 +255,10 @@ do {
 
 // MARK: Rules
 do {
-    let base = FileManager.default.temporaryDirectory.appendingPathComponent("kimbiseo-rules-\(UUID().uuidString)")
-    let rules = base.appendingPathComponent("shared/rules")
-    try? FileManager.default.createDirectory(at: rules, withIntermediateDirectories: true)
-    try? "- 공통 규칙".write(to: rules.appendingPathComponent("jira.md"), atomically: true, encoding: .utf8)
-    try? "- 예시".write(to: rules.appendingPathComponent("jira.example.md"), atomically: true, encoding: .utf8)
-    try? "- 팀 규칙".write(to: rules.appendingPathComponent("jira.local.md"), atomically: true, encoding: .utf8)
-    var s = AppSettings.default
-    s.repoDir = base.path
-    let files = Rules.files(settings: s).filter { $0.layer != .mine }
-    check(files.map(\.name) == ["jira.md", "jira.local.md"] && files.map(\.layer) == [.shared, .team], "rules: 공통 → 팀, 예시는 읽지 않음")
-    let prompt = Rules.prompt(settings: s)
-    check(prompt.contains("## [공통] jira.md\n- 공통 규칙") && prompt.contains("## [팀] jira.local.md")
-          && prompt.range(of: "공통 규칙")!.lowerBound < prompt.range(of: "팀 규칙")!.lowerBound && !prompt.contains("예시"), "rules: 안내 글 순서")
+    check(Rules.safeName("Wiki 규칙.md") == "wiki규칙" && Rules.safeName("!!") == "memory", "rules: 파일 이름 정리")
+    check(Rules.File(url: Rules.myDir.appendingPathComponent("jira.md")).name == "rules/jira.md"
+          && Rules.File(url: Rules.claudeMd).name == "CLAUDE.md", "rules: 김비서 폴더 기준 이름")
+    check(!Rules.prompt().contains("## CLAUDE.md"), "rules: CLAUDE.md 는 Claude Code 가 읽으므로 안 붙임")
     let reply = "알겠어요.\n```kimbiseo-rule\n[{\"file\":\"jira\",\"text\":\"제목 앞에 [회의]\"},{\"file\":\"memory\",\"text\":\" \"}]\n```"
     let (text, notes) = RuleProposal.extract(from: reply)
     check(text == "알겠어요." && notes == [RuleNote(file: "jira", text: "제목 앞에 [회의]")], "rules: 제안 읽기 (빈 줄은 버림)")
@@ -283,7 +274,6 @@ do {
     var quiet = decodedAlarm!; quiet.notifyMac = false
     let round = (try? JSONEncoder().encode([quiet])).flatMap { try? JSONDecoder().decode([Alarm].self, from: $0) }?.first
     check(round?.toMac == false && round?.toPanel == true, "alarm: 받을 곳 저장 왕복")
-    try? FileManager.default.removeItem(at: base)
     let forget = RuleProposal.extract(from: "```kimbiseo-rule\n[{\"file\":\"memory\",\"text\":\"가격팀\",\"forget\":true}]\n```").notes
     check(forget.count == 1 && forget[0].isForget && forget[0].isMemory, "memory: 잊기 제안 읽기")
     check(RuleProposal.extract(from: RuleProposal.hint).notes.first?.isMemory == true, "memory: 안내 예시의 기억이 읽힘")

@@ -57,7 +57,7 @@ public struct JiraCreated: Codable, Equatable {
 }
 
 /// 채팅 답변의 ```kimbiseo-jira 블록과, 질문에 몰래 붙이는 안내.
-/// 프로젝트·유형·기간 같은 기본값은 앱 설정이 아니라 규칙 md(공통 → 팀 → 나)에 적어 두고 Claude 가 그대로 따른다.
+/// 프로젝트·유형·기간 같은 기본값은 앱 설정이 아니라 김비서 폴더의 rules/jira.md 에 적어 두고 Claude 가 그대로 따른다.
 public enum JiraProposal {
     private struct Block: Decodable {
         let issue: JiraDraft?
