@@ -357,6 +357,7 @@ struct AlarmEditor: View {
                         }
                     }
                 }
+                .grayCard()
                 if mode == .time {
                 Section("시각과 반복") {
                     DatePicker("시각", selection: $time, displayedComponents: .hourAndMinute)
@@ -379,6 +380,7 @@ struct AlarmEditor: View {
                         DatePicker("날짜", selection: $onceDate, displayedComponents: .date)
                     }
                 }
+                .grayCard()
                 }
                 Section("받을 곳") {
                     HStack(spacing: 16) {
@@ -394,6 +396,7 @@ struct AlarmEditor: View {
                             .font(.caption).foregroundStyle(.orange)
                     }
                 }
+                .grayCard()
                 Section("무엇을") {
                     if !groups.isEmpty {
                         Picker("그룹", selection: $alarm.group) {
@@ -404,7 +407,7 @@ struct AlarmEditor: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("제목").font(.caption).foregroundStyle(.secondary)
                         TextField("", text: $alarm.title, prompt: Text("알림에 보일 이름. 예: 근무일정 확인"))
-                            .textFieldStyle(.roundedBorder)
+                            .whiteField()
                             .labelsHidden()
                     }
                     if isDailyReport {
@@ -417,12 +420,13 @@ struct AlarmEditor: View {
                                       prompt: Text(mode == .trigger ? "비워두면 알림만. 예: 이 PR 변경 내용 요약해줘"
                                                                     : "비워두면 알림만. 예: 이번 주 내 근무일정 알려줘"),
                                       axis: .vertical)
-                                .textFieldStyle(.roundedBorder)
+                                .whiteField()
                                 .labelsHidden()
                                 .lineLimit(3...6)
                         }
                     }
                 }
+                .grayCard()
             }
             .formStyle(.grouped)
 

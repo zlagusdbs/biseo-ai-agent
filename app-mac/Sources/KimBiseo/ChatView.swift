@@ -392,8 +392,12 @@ private struct JiraDraftEditor: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("설명 (Jira 위키 문법)").font(.caption).foregroundStyle(.secondary)
                     TextEditor(text: $draft.description).font(.body.monospaced()).frame(minHeight: 140)
-                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
+                        .scrollContentBackground(.hidden)
+                        .padding(4)
+                        .background(EditorStyle.field, in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(EditorStyle.border))
                 }
+                .grayCard()
                 field("Original Estimate", $draft.originalEstimate, "예: 365d, 2w, 4h")
                 field("Target start", $draft.targetStart, "yyyy-MM-dd, 비우면 안 넣음")
                 field("Target end", $draft.targetEnd, "yyyy-MM-dd, 비우면 안 넣음")
@@ -415,8 +419,9 @@ private struct JiraDraftEditor: View {
     private func field(_ title: String, _ text: Binding<String>, _ hint: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            TextField("", text: text, prompt: Text(hint)).textFieldStyle(.roundedBorder).labelsHidden()
+            TextField("", text: text, prompt: Text(hint)).whiteField().labelsHidden()
         }
+        .grayCard()
     }
 }
 
