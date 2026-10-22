@@ -160,6 +160,52 @@ do {
     check(TriggerEvent.events(for: "github").count == 3 && TriggerEvent.systems == ["github", "deploy", "jira"], "trigger: 이벤트 목록")
 }
 
+// MARK: AlarmProposal
+do {
+    let reply = "알림 3개를 준비했어요.\n\n```kimbiseo-alarm\n[{\"title\":\"1:1 요청\",\"hour\":9,\"minute\":0,\"repeat\":\"daily\",\"prompt\":\"\"},{\"title\":\"1:1 요청\",\"hour\":13,\"repeat\":\"weekdays\"},{\"title\":\"x\",\"hour\":25}]\n```"
+    let (text, alarms) = AlarmProposal.extract(from: reply)
+    check(text == "알림 3개를 준비했어요.", "proposal: 블록은 본문에서 뺌")
+    check(alarms.count == 2 && alarms[0].hour == 9 && alarms[0].repeatRule == .daily && alarms[1].minute == 0
+          && alarms[1].repeatRule == .weekdays && alarms[0].prompt.isEmpty, "proposal: 알림 읽기, 잘못된 시각은 버림")
+    check(AlarmProposal.extract(from: "그냥 답").alarms.isEmpty, "proposal: 블록 없으면 없음")
+    check(AlarmProposal.extract(from: "```kimbiseo-alarm\n깨진 json\n```").text.isEmpty, "proposal: 깨진 블록도 본문에서 뺌")
+    check(AlarmProposal.repeatRule("days:4,2,2") == .days([2, 4]) && AlarmProposal.repeatRule("once:2026-10-23") == .once("2026-10-23")
+          && AlarmProposal.repeatRule("days:9") == nil && AlarmProposal.repeatRule("hourly") == nil, "proposal: 반복 규칙")
+    let loose = AlarmProposal.extract(from: "```kimbiseo-alarm\n[{\"time\":\"18:30\",\"repeat\":\"daily\",\"message\":\"m\"}]\n```").alarms
+    check(loose.count == 1 && loose[0].hour == 18 && loose[0].minute == 30 && loose[0].title == "m", "proposal: time·message 키도 받음")
+    check(AlarmProposal.looksLikeRequest("매일 9시에 잊지말라고 알림 기록해줘") && AlarmProposal.looksLikeRequest("매일 오전 9시에 1:1 알람을 해야 한다고 알람설정해줘")
+          && AlarmProposal.looksLikeRequest("잊지 않게 리마인드 해줘")
+          && !AlarmProposal.looksLikeRequest("내 미완료 Jira"), "proposal: 알림 요청 판단 (알람도)")
+    check(AlarmProposal.extract(from: AlarmProposal.hint).alarms.count == 1, "proposal: 안내 속 예시 형식이 실제로 읽힘")
+    let msg = ChatMessage(role: .assistant, text: "t", alarms: alarms)
+    let back = (try? JSONEncoder().encode(msg)).flatMap { try? JSONDecoder().decode(ChatMessage.self, from: $0) }
+    check(back?.alarms.map(\.id) == alarms.map(\.id), "proposal: 대화 기록에 저장 (같은 id 라 다시 등록 안 됨)")
+
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "Asia/Seoul")!
+    let afternoon = cal.date(from: DateComponents(year: 2026, month: 10, day: 22, hour: 14))!
+    var nine = alarms[0]; nine.resetSchedule(now: afternoon, calendar: cal)
+    check(!nine.shouldRun(now: afternoon, calendar: cal), "proposal: 오후에 등록한 9시 알림은 바로 울리지 않음")
+    var six = nine; six.hour = 18; six.resetSchedule(now: afternoon, calendar: cal)
+    check(six.lastRunDay == nil && six.shouldRun(now: cal.date(byAdding: .hour, value: 4, to: afternoon)!, calendar: cal), "proposal: 오늘 남은 18시는 울림")
+}
+
+// MARK: AlarmGroup
+do {
+    let a = Alarm(title: "1:1 요청", prompt: "", hour: 9, minute: 0, repeatRule: .daily, group: "1:1")
+    let b = Alarm(title: "근무일정", prompt: "p", hour: 10, minute: 0, repeatRule: .weekdays)
+    let c = Alarm(title: "1:1 요청", prompt: "", hour: 13, minute: 0, repeatRule: .daily, enabled: false, group: "1:1")
+    let d = Alarm(title: "x", prompt: "p", hour: 11, minute: 0, repeatRule: .daily, group: "지운 그룹")
+    let t = Alarm(title: "리뷰", prompt: "", hour: 0, minute: 0, repeatRule: .daily,
+                  trigger: Trigger(system: "github", event: "github.review_requested"), group: "1:1")
+    let split = AlarmGroup.make([a, b, c, d, t], groups: ["1:1", "빈 그룹"])
+    check(split.groups.map(\.alarms.count) == [3, 0] && split.ungrouped.map(\.id) == [b.id, d.id],
+          "group: 그룹 순서대로, 빈 그룹도, 없는 그룹 이름은 그룹 없음으로")
+    check(split.groups[0].summary == "09:00 · 13:00 매일 · 트리거 1" && split.groups[0].anyEnabled, "group: 요약과 켜짐")
+    check(split.groups[1].summary.contains("끌어다"), "group: 빈 그룹 안내")
+    let old = #"[{"id":"6F1D6F5E-0000-0000-0000-000000000003","title":"t","prompt":"p","hour":9,"minute":0,"repeatRule":{"daily":{}},"enabled":true}]"#
+    check((try? JSONDecoder().decode([Alarm].self, from: Data(old.utf8)))?.first?.group == nil, "group: 예전 알림 파일은 그룹 없음")
+}
+
 // MARK: AppSettings
 do {
     let old = #"{"repoDir":"/r","claudePath":"/c","uvPath":"/u","reportHour":10,"reportMinute":0,"lastReportDay":"2026-10-21"}"#

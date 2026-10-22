@@ -58,6 +58,12 @@ struct ChatView: View {
                                 _ = system
                             }
                             .id(message.id)
+                            if !message.alarms.isEmpty {
+                                AlarmProposalCard(alarms: message.alarms,
+                                                  registered: message.alarms.allSatisfy { a in model.alarms.contains { $0.id == a.id } },
+                                                  register: { model.register(message.alarms) },
+                                                  open: { model.selected = .alarms })
+                            }
                         }
                         if chat.isBusy {
                             HStack(spacing: 8) {
@@ -221,6 +227,40 @@ private struct MessageRow: View {
         case .assistant: return Color.white
         case .error: return Color.red.opacity(0.15)
         }
+    }
+}
+
+/// 답변이 제안한 알림. [알림에 등록]을 눌러야 알림 메뉴에 들어간다.
+private struct AlarmProposalCard: View {
+    let alarms: [Alarm]
+    let registered: Bool
+    let register: () -> Void
+    let open: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("알림 \(alarms.count)개", systemImage: "bell.badge").font(.callout.weight(.medium))
+            ForEach(alarms) { alarm in
+                HStack(spacing: 6) {
+                    Text(alarm.timeText).monospacedDigit()
+                    Text(alarm.repeatRule.description).foregroundStyle(.secondary)
+                    Text(alarm.title).lineLimit(1)
+                }
+                .font(.callout)
+            }
+            HStack {
+                if registered {
+                    Label("알림 메뉴에 등록했어요", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Button("알림 보기", action: open).buttonStyle(.link)
+                } else {
+                    Button("알림에 등록", action: register).buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(.top, 2)
+        }
+        .padding(10)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.4)))
     }
 }
 

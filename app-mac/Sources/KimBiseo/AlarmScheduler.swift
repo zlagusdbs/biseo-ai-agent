@@ -45,6 +45,11 @@ final class AlarmScheduler {
             model.alarms[i].lastRunDay = today
             if case .once = alarm.repeatRule { model.alarms[i].enabled = false }
         }
+        if alarm.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            notifier.send(title: "🔔 \(alarm.title)", body: "잊지 마세요.")
+            reminders.add(title: alarm.title, text: "잊지 마세요: \(alarm.title)", failed: false)
+            return
+        }
         guard let prompt = AlarmStore.resolvePrompt(alarm, settings: model.settings) else {
             notifier.send(title: alarm.title, body: "알림 내용을 읽지 못했어요.")
             reminders.add(title: alarm.title, text: "알림 내용을 읽지 못했어요.", failed: true)

@@ -42,6 +42,7 @@ final class ChatSession: ObservableObject {
         guard !trimmed.isEmpty || !images.isEmpty else { return }
         if trimmed.isEmpty { trimmed = "이 이미지를 보고 설명해줘." }
         append(ChatMessage(role: .user, text: text.trimmingCharacters(in: .whitespacesAndNewlines), images: images.map(\.path)))
+        if AlarmProposal.looksLikeRequest(trimmed) { trimmed += AlarmProposal.hint }
         queue.append(.chat(trimmed, images))
         processNext()
     }
@@ -96,7 +97,8 @@ final class ChatSession: ObservableObject {
         switch response {
         case .success(let text, let newSession):
             if !newSession.isEmpty { sessionId = newSession }
-            append(ChatMessage(role: .assistant, text: text))
+            let (clean, alarms) = AlarmProposal.extract(from: text)
+            append(ChatMessage(role: .assistant, text: clean, alarms: alarms))
         case .failure(let failure):
             append(ChatMessage(role: .error, text: failure.message))
             lastFailedImages = images
