@@ -13,6 +13,8 @@ public struct AppSettings: Codable, Equatable {
     public var hotkey: Hotkey = .default
     /// true 면 김비서만 따로 Claude 에 로그인한다 (터미널 Claude Code 로그인과 분리, 다른 조직·플랜 사용 가능).
     public var separateClaudeLogin = false
+    /// 주인(사용자) 이름. 비어 있으면 처음 사용으로 보고 채팅창에서 이름을 묻는다.
+    public var ownerName = ""
 
     public static let defaultAssistantName = "김비서"
 
@@ -50,6 +52,7 @@ public struct AppSettings: Codable, Equatable {
         lastReportDay = try c.decodeIfPresent(String.self, forKey: .lastReportDay)
         hotkey = try c.decodeIfPresent(Hotkey.self, forKey: .hotkey) ?? .default
         separateClaudeLogin = try c.decodeIfPresent(Bool.self, forKey: .separateClaudeLogin) ?? false
+        ownerName = try c.decodeIfPresent(String.self, forKey: .ownerName) ?? ""
     }
 }
 

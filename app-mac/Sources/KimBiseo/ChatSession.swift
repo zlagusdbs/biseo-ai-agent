@@ -48,6 +48,8 @@ final class ChatSession: ObservableObject {
             trimmed += JiraProposal.hint(defaults: jiraDefaults(), now: Date(), calendar: .current)
         } else if AlarmProposal.looksLikeRequest(trimmed) {
             trimmed += AlarmProposal.hint
+        } else if RuleProposal.looksLikeRequest(trimmed) {
+            trimmed += RuleProposal.hint
         }
         queue.append(.chat(trimmed, images))
         processNext()
@@ -69,6 +71,11 @@ final class ChatSession: ObservableObject {
     func cancel() {
         queue.removeAll()
         runner.cancel()
+    }
+
+    /// Claude 를 부르지 않고 김비서 말로 바로 붙인다 (처음 인사 등).
+    func say(_ text: String) {
+        append(ChatMessage(role: .assistant, text: text))
     }
 
     /// 계정이 바뀌면 이전 세션을 이어 쓸 수 없어서 세션만 잊는다 (화면의 대화는 남김).
@@ -110,8 +117,11 @@ final class ChatSession: ObservableObject {
         case .success(let text, let newSession):
             if !newSession.isEmpty { sessionId = newSession }
             let (afterAlarms, alarms) = AlarmProposal.extract(from: text)
-            let (clean, jira, defaults) = JiraProposal.extract(from: afterAlarms)
-            append(ChatMessage(role: .assistant, text: clean, alarms: alarms, jira: jira, jiraDefaults: defaults))
+            let (afterJira, jira, defaults) = JiraProposal.extract(from: afterAlarms)
+            let (clean, rules) = RuleProposal.extract(from: afterJira)
+            var message = ChatMessage(role: .assistant, text: clean, alarms: alarms, jira: jira, jiraDefaults: defaults)
+            message.rules = rules
+            append(message)
         case .failure(let failure):
             append(ChatMessage(role: .error, text: failure.message))
             lastFailedImages = images

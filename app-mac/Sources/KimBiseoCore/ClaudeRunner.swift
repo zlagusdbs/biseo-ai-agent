@@ -21,6 +21,11 @@ public final class ClaudeRunner: @unchecked Sendable {
             if !name.isEmpty && name != AppSettings.defaultAssistantName {
                 systemPrompt += "\n- 사용자가 네 이름을 \"\(name)\"(으)로 바꿨다. 자신을 \"\(name)\"(이)라고 부른다.\n"
             }
+            let owner = settings.ownerName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !owner.isEmpty {
+                systemPrompt += "\n- 주인(사용자)의 이름은 \(owner)이다. 부를 때는 \"\(owner)님\"이라고 한다.\n"
+            }
+            systemPrompt += Rules.prompt(settings: settings)
             let args = ClaudeCommand.arguments(sessionId: sessionId,
                                                mcpConfigPath: AppPaths.mcpConfig.path, systemPrompt: systemPrompt)
             let out = try await process.run(executable: settings.claudePath, arguments: args,

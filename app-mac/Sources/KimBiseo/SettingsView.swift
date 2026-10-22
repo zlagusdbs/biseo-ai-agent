@@ -7,6 +7,10 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("이름") {
+                TextField("주인 이름", text: $model.settings.ownerName, prompt: Text("김비서가 부를 이름"))
+            }
+            RulesSection(settings: model.settings)
             Section("단축키") {
                 HotkeyRecorder(hotkey: $model.settings.hotkey)
             }
@@ -179,4 +183,51 @@ private struct ClaudeAccountSection: View {
         account = await ClaudeLogin.account(settings: model.settings)
         loading = false
     }
+}
+
+/// 김비서 규칙 md 목록. 질문할 때마다 공통 → 팀 → 나 순서로 읽는다.
+private struct RulesSection: View {
+    let settings: AppSettings
+    @State private var files: [Rules.File] = []
+
+    var body: some View {
+        Section {
+            if files.isEmpty {
+                Text("규칙 파일이 없어요.").foregroundStyle(.secondary)
+            }
+            ForEach(files) { file in
+                HStack {
+                    Text(file.layer.rawValue).font(.caption.weight(.medium))
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.12), in: Capsule())
+                    Text(file.name)
+                    Spacer()
+                    Button("열기") { NSWorkspace.shared.open(file.url) }
+                }
+            }
+            HStack {
+                Button("새 내 규칙") {
+                    if let url = try? Rules.append("여기에 규칙을 한 줄씩 적어요", to: "my-rules") {
+                        NSWorkspace.shared.open(url)
+                        reload()
+                    }
+                }
+                Button("내 규칙 폴더") {
+                    try? FileManager.default.createDirectory(at: Rules.myDir, withIntermediateDirectories: true)
+                    NSWorkspace.shared.open(Rules.myDir)
+                }
+                Button("팀 규칙 폴더") { NSWorkspace.shared.open(Rules.sharedDir(settings: settings)) }
+                Spacer()
+                Button { reload() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless)
+            }
+        } header: {
+            Text("규칙")
+        } footer: {
+            Text("공통(저장소, 공개) → 팀(*.local.md, Git 에 안 올라감) → 나(이 Mac) 순서로 읽고, 서로 다르면 뒤의 규칙을 따라요. 고친 내용은 다음 질문부터 바로 적용돼요.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .task { reload() }
+    }
+
+    private func reload() { files = Rules.files(settings: settings) }
 }
