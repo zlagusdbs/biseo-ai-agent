@@ -155,37 +155,31 @@ private struct RulesSection: View {
     @State private var creating: Rules.Kind?
     @State private var newName = ""
 
+    private static let rootHelp = "김비서 전체에 늘 적용하는 기본 지시예요 (말투, 답하는 방식 등).\n김비서를 실행할 때 Claude Code 가 김비서 폴더의 CLAUDE.md 를 직접 읽기 때문에, 지우면 기본 지시가 사라져요. 그래서 고치기만 하고 지울 수는 없어요."
+    private static let rulesHelp = "질문할 때마다 모든 파일을 통째로 읽어요. 길수록 질문마다 비용이 늘고 답이 느려지니, 늘 지켜야 할 것만 짧게 적고 파일당 200줄을 넘기지 마세요.\n채팅에서 \"기억해\" 하고 [기억하기]를 누르면 rules/memory.md 에 쌓여요."
+    private static let skillsHelp = "주제별 안내서예요. 평소엔 한 줄 설명만 보내고, 질문에 그 주제의 키워드가 나오면 그때 본문을 읽어요.\n예: Jira 이야기가 나오면 skills/jira.md 를 읽어요. 키워드가 없어도 필요하면 김비서가 직접 찾아 읽어요.\n파일 맨 위에 description(한 줄 설명)과 keywords(쉼표로 구분)를 적어 주세요."
+
     var body: some View {
-        Group {
-            Section {
-                ForEach(files.filter { $0.kind == .root }) { file in
-                    fileRow(file, deletable: false)
-                }
-                if !files.contains(where: { $0.kind == .root }) {
-                    Text("CLAUDE.md 가 없어요. 폴더를 열어 만들어 주세요.").foregroundStyle(.secondary)
-                }
-            } header: {
-                header("root", help: "김비서 전체에 늘 적용하는 기본 지시예요 (말투, 답하는 방식 등).\n김비서를 실행할 때 Claude Code 가 김비서 폴더의 CLAUDE.md 를 직접 읽기 때문에, 지우면 기본 지시가 사라져요. 그래서 고치기만 하고 지울 수는 없어요.")
+        Section {
+            group("root", help: Self.rootHelp, kind: nil)
+            ForEach(files.filter { $0.kind == .root }) { fileRow($0, deletable: false) }
+            group("rules", help: Self.rulesHelp, kind: .rule)
+            let rules = files.filter { $0.kind == .rule }
+            if rules.isEmpty { empty }
+            ForEach(rules) { fileRow($0, deletable: true) }
+            group("skills", help: Self.skillsHelp, kind: .skill)
+            let skills = files.filter { $0.kind == .skill }
+            if skills.isEmpty { empty }
+            ForEach(skills) { fileRow($0, deletable: true) }
+        } header: {
+            HStack {
+                Text("규칙")
+                Spacer()
+                Button("폴더 열기") { NSWorkspace.shared.open(Rules.homeDir) }.buttonStyle(.link).font(.caption)
+                Button { reload() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless).help("새로고침")
             }
-            Section {
-                ForEach(files.filter { $0.kind == .rule }) { file in fileRow(file, deletable: true) }
-                Button("새 규칙") { newName = ""; creating = .rule }
-            } header: {
-                header("rules", help: "질문할 때마다 모든 파일을 통째로 읽어요. 길수록 질문마다 비용이 늘고 답이 느려지니, 늘 지켜야 할 것만 짧게 적고 파일당 200줄을 넘기지 마세요.\n채팅에서 \"기억해\" 하고 [기억하기]를 누르면 rules/memory.md 에 쌓여요.")
-            }
-            Section {
-                ForEach(files.filter { $0.kind == .skill }) { file in fileRow(file, deletable: true) }
-                Button("새 스킬") { newName = ""; creating = .skill }
-            } header: {
-                header("skills", help: "주제별 안내서예요. 평소엔 한 줄 설명만 보내고, 질문에 그 주제의 키워드가 나오면 그때 본문을 읽어요.\n예: Jira 이야기가 나오면 skills/jira.md 를 읽어요. 키워드가 없어도 필요하면 김비서가 직접 찾아 읽어요.\n파일 맨 위에 description(한 줄 설명)과 keywords(쉼표로 구분)를 적어 주세요.")
-            } footer: {
-                HStack {
-                    Text("고친 내용은 다음 질문부터 바로 적용돼요.").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("폴더 열기") { NSWorkspace.shared.open(Rules.homeDir) }.buttonStyle(.link)
-                    Button { reload() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless).help("새로고침")
-                }
-            }
+        } footer: {
+            Text("고친 내용은 다음 질문부터 바로 적용돼요.").font(.caption).foregroundStyle(.secondary)
         }
         .task { reload() }
         .alert("파일을 삭제할까요?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
@@ -207,29 +201,44 @@ private struct RulesSection: View {
         }
     }
 
-    private func header(_ title: String, help: String) -> some View {
+    /// 묶음 이름 줄: root · rules · skills + ? 설명 + (새 파일 +)
+    private func group(_ title: String, help: String, kind: Rules.Kind?) -> some View {
         HStack(spacing: 6) {
-            Text(title).font(.body.monospaced().weight(.semibold))
+            Text(title).font(.caption.monospaced().weight(.semibold)).foregroundStyle(.secondary)
             HelpIcon(text: help)
+            Spacer()
+            if let kind {
+                Button { newName = ""; creating = kind } label: { Image(systemName: "plus") }
+                    .buttonStyle(.borderless).font(.caption).help(kind == .skill ? "새 스킬" : "새 규칙")
+            }
         }
     }
 
+    private var empty: some View {
+        Text("없음").font(.caption).foregroundStyle(.tertiary).padding(.leading, 18)
+    }
+
     private func fileRow(_ file: Rules.File, deletable: Bool) -> some View {
-        HStack {
-            Image(systemName: "doc.text").foregroundStyle(.secondary)
-            Text(file.name).font(.body.monospaced())
+        HStack(spacing: 6) {
+            Image(systemName: "doc.text").font(.caption).foregroundStyle(.secondary)
+            Text(file.url.lastPathComponent).font(.callout.monospaced())
             if file.kind == .rule {
                 let lines = file.lineCount
                 Text(lines > Rules.ruleLineLimit ? "\(lines)줄 · 200줄 넘음" : "\(lines)줄")
-                    .font(.caption).foregroundStyle(lines > Rules.ruleLineLimit ? Color.orange : Color.secondary)
+                    .font(.caption2).foregroundStyle(lines > Rules.ruleLineLimit ? Color.orange : Color.secondary)
             }
             Spacer()
-            Button("열기") { NSWorkspace.shared.open(file.url) }
-            if deletable {
-                Button(role: .destructive) { deleting = file } label: { Image(systemName: "trash") }
-                    .buttonStyle(.borderless).help("삭제")
+            HStack(spacing: 10) {
+                Button { NSWorkspace.shared.open(file.url) } label: { Image(systemName: "arrow.up.forward.square") }.help("열기")
+                if deletable {
+                    Button(role: .destructive) { deleting = file } label: { Image(systemName: "trash") }
+                        .foregroundStyle(.red).help("삭제")
+                }
             }
+            .buttonStyle(.borderless)
+            .font(.caption)
         }
+        .padding(.leading, 18)
     }
 
     private func reload() { files = Rules.files() }
