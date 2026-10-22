@@ -243,7 +243,7 @@ private struct MessageRow: View {
 
     private var background: Color {
         switch message.role {
-        case .user: return Color(red: 0.73, green: 0.84, blue: 1.0)
+        case .user: return Color(red: 1.0, green: 0.93, blue: 0.66)     // 내 말풍선: 연한 노랑 (파란 선택 표시가 잘 보이게)
         case .assistant: return Color.white
         case .error: return Color.red.opacity(0.15)
         }
