@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kimbiseo": {
+      "command": "{{UV_PATH}}",
+      "args": ["--directory", "{{MCP_SERVER_DIR}}", "run", "kimbiseo", "serve"]
+    }
+  }
+}

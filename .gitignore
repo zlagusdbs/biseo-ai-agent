@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.build/
+build/
+.DS_Store
+
+# 회사 주소 (예시: shared/connections.example.json)
+shared/connections.local.json
+# 사내 정보가 담긴 작업 문서
+docs/specs/
+docs/plans/
+docs/m0-findings.md
