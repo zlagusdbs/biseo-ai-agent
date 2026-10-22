@@ -119,6 +119,34 @@ class JiraClient(BasicClient):
         return Issue(key=key, summary=draft.summary, status="", priority=None, due=None,
                      url=f"{self.base_url}/browse/{key}")
 
+    def add_worklog(self, issue_key: str, started: str, seconds: int, comment: str = "") -> dict:
+        """작업 시간 기록. started 는 2026-10-22T10:00:00.000+0900 형식."""
+        if seconds <= 0:
+            raise RequestRejected(self.system, "작업 시간은 0보다 커야 해요")
+        body = {"started": started, "timeSpentSeconds": seconds}
+        if comment:
+            body["comment"] = comment
+        data = self._post(f"/rest/api/2/issue/{issue_key}/worklog", body).json()
+        return {"id": str(data.get("id", "")), "issueKey": issue_key, "url": f"{self.base_url}/browse/{issue_key}"}
+
+    def my_worklogs(self, date: str) -> dict:
+        """그날(yyyy-MM-dd) 내가 남긴 worklog. 이슈별 시간과 합계(초)."""
+        me = self.myself()
+        jql = f'worklogAuthor = currentUser() AND worklogDate = "{date}"'
+        issues = self._get("/rest/api/2/search", params={"jql": jql, "maxResults": 100,
+                                                         "fields": "summary"}).json().get("issues", [])
+        rows = []
+        for raw in issues:
+            logs = self._get(f"/rest/api/2/issue/{raw['key']}/worklog").json().get("worklogs", [])
+            for w in logs:
+                if (w.get("author") or {}).get("name") != me or not str(w.get("started", "")).startswith(date):
+                    continue
+                rows.append({"issueKey": raw["key"], "summary": raw.get("fields", {}).get("summary", ""),
+                             "started": w.get("started", "")[11:16], "seconds": int(w.get("timeSpentSeconds", 0)),
+                             "comment": w.get("comment") or "", "url": f"{self.base_url}/browse/{raw['key']}"})
+        rows.sort(key=lambda r: r["started"])
+        return {"date": date, "totalSeconds": sum(r["seconds"] for r in rows), "worklogs": rows}
+
     def _issue(self, raw: dict) -> Issue:
         fields = raw.get("fields", {})
         return Issue(

@@ -45,6 +45,21 @@ public enum KimbiseoCLI {
         return try decode(JiraCreated.self, out)
     }
 
+    /// worklog 기록. 사용자가 카드에서 [기록하기]를 눌렀을 때만 부른다.
+    public static func jiraWorklog(_ draft: WorklogDraft, settings: AppSettings) async throws {
+        let body: [String: Any] = ["issueKey": draft.issueKey, "started": draft.started(),
+                                   "timeSpentSeconds": draft.minutes * 60, "comment": draft.comment]
+        let input = String(decoding: try JSONSerialization.data(withJSONObject: body), as: UTF8.self)
+        let out = try await run(["jira", "worklog"], stdin: input, settings: settings)
+        struct Failure: Decodable { let error: String; let detail: String? }
+        if let failure = try? JSONDecoder().decode(Failure.self, from: out.stdout) {
+            throw KimbiseoCLIError.failed(JiraFailure.message(code: failure.error, detail: failure.detail ?? ""))
+        }
+        guard out.exitCode == 0 else {
+            throw KimbiseoCLIError.failed(String(decoding: out.stderr, as: UTF8.self))
+        }
+    }
+
     private static func run(_ args: [String], stdin: String?, settings: AppSettings) async throws -> ProcessOutput {
         let out = try await ProcessRunner().run(
             executable: settings.uvPath,

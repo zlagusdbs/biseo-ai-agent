@@ -62,6 +62,12 @@ def jira_projects(query: str = "") -> dict:
     return _with_system("jira", lambda base_url, cred: {"projects": JiraClient(base_url, cred).projects(query)})
 
 
+def jira_my_worklogs(date: str = "") -> dict:
+    """그날(yyyy-MM-dd, 비우면 오늘) 내가 Jira 에 남긴 작업 시간(worklog). 이슈별 시작 시각·시간(초)과 합계."""
+    target = date or datetime.date.today().isoformat()
+    return _with_system("jira", lambda base_url, cred: JiraClient(base_url, cred).my_worklogs(target))
+
+
 def wiki_search(query: str, limit: int = 10) -> dict:
     """사내 Wiki(Confluence) 페이지를 검색어로 찾는다. 결과의 id 로 wiki_get_page 를 호출하면 본문을 읽을 수 있다."""
     def work(base_url: str, cred: Credential) -> dict:
@@ -115,7 +121,7 @@ def github_review_requests() -> dict:
     return _with_system("github", lambda base_url, cred: {"pullRequests": github_client.review_requests(base_url)})
 
 
-TOOLS = [jira_search, jira_projects, wiki_search, wiki_get_page, hr_holidays, hr_flexwork_week,
+TOOLS = [jira_search, jira_projects, jira_my_worklogs, wiki_search, wiki_get_page, hr_holidays, hr_flexwork_week,
          deploy_my_releases, deploy_approvals, deploy_domain_releases, deploy_release_search, github_review_requests]
 for _tool in TOOLS:
     mcp.tool()(_tool)

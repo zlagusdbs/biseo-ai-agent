@@ -134,3 +134,42 @@ def test_projects_filter():
     c = client(lambda r: httpx.Response(200, json=rows))
     assert [p["key"] for p in c.projects("pricing")] == ["PRICING", "PDB"]
     assert len(c.projects()) == 3
+
+
+def test_add_worklog_posts_started_and_seconds():
+    import json as _json
+    seen = {}
+
+    def handler(request):
+        seen["path"], seen["body"] = request.url.path, _json.loads(request.content)
+        return httpx.Response(201, json={"id": 77})
+
+    result = client(handler).add_worklog("MYPROJ-100", "2026-10-22T10:00:00.000+0900", 3600, "회의")
+    assert seen["path"] == "/rest/api/2/issue/MYPROJ-100/worklog"
+    assert seen["body"] == {"started": "2026-10-22T10:00:00.000+0900", "timeSpentSeconds": 3600, "comment": "회의"}
+    assert result["id"] == "77"
+
+
+def test_add_worklog_rejects_zero():
+    with pytest.raises(RequestRejected):
+        client(lambda r: httpx.Response(201, json={})).add_worklog("A-1", "2026-10-22T10:00:00.000+0900", 0)
+
+
+def test_my_worklogs_filters_me_and_date():
+    def handler(request):
+        path = request.url.path
+        if path == "/rest/api/2/myself":
+            return httpx.Response(200, json={"name": "me"})
+        if path == "/rest/api/2/search":
+            assert 'worklogDate = "2026-10-22"' in request.url.params["jql"]
+            return httpx.Response(200, json={"issues": [{"key": "A-1", "fields": {"summary": "회의"}}]})
+        return httpx.Response(200, json={"worklogs": [
+            {"author": {"name": "me"}, "started": "2026-10-22T13:00:00.000+0900", "timeSpentSeconds": 1800},
+            {"author": {"name": "me"}, "started": "2026-10-22T10:00:00.000+0900", "timeSpentSeconds": 3600, "comment": "c"},
+            {"author": {"name": "other"}, "started": "2026-10-22T10:00:00.000+0900", "timeSpentSeconds": 999},
+            {"author": {"name": "me"}, "started": "2026-10-21T10:00:00.000+0900", "timeSpentSeconds": 999},
+        ]})
+
+    result = client(handler).my_worklogs("2026-10-22")
+    assert result["totalSeconds"] == 5400
+    assert [(w["started"], w["seconds"]) for w in result["worklogs"]] == [("10:00", 3600), ("13:00", 1800)]

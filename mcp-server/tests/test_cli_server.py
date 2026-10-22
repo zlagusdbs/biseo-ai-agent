@@ -172,3 +172,16 @@ def test_jira_create_cli_success(monkeypatch):
     body = json.dumps({"project": "PRICING", "issueType": "Story", "summary": "s", "description": "d"})
     assert cli.main(["jira", "create"], stdin=io.StringIO(body), stdout=out) == 0
     assert json.loads(out.getvalue()) == {"key": "PRICING-1", "url": "https://j/browse/PRICING-1"}
+
+
+def test_jira_worklog_cli(monkeypatch):
+    from kimbiseo.jira_client import JiraClient
+    out = io.StringIO()
+    assert cli.main(["jira", "worklog"], stdin=io.StringIO("{}"), stdout=out) == 1
+    assert json.loads(out.getvalue())["error"] == "BAD_INPUT"
+    save("jira", Credential("u", "p"))
+    monkeypatch.setattr(JiraClient, "add_worklog", lambda self, k, s, sec, c: {"id": "1", "issueKey": k, "url": "u"})
+    out = io.StringIO()
+    body = json.dumps({"issueKey": "A-1", "started": "2026-10-22T10:00:00.000+0900", "timeSpentSeconds": 3600})
+    assert cli.main(["jira", "worklog"], stdin=io.StringIO(body), stdout=out) == 0
+    assert json.loads(out.getvalue())["issueKey"] == "A-1"

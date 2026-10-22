@@ -76,6 +76,10 @@ struct ChatView: View {
                                     chat.update(message.id) { $0.rulesSaved = true }
                                 }
                             }
+                            if !message.worklogs.isEmpty {
+                                WorklogCard(model: model, chat: chat, messageID: message.id,
+                                            drafts: message.worklogs, done: Set(message.worklogsDone))
+                            }
                             if let draft = message.jira {
                                 JiraDraftCard(model: model, chat: chat, messageID: message.id, draft: draft,
                                               proposedDefaults: message.jiraDefaults, created: message.jiraCreated)
@@ -504,6 +508,74 @@ private struct RuleProposalCard: View {
         .padding(10)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.4)))
+    }
+}
+
+/// 답변이 제안한 worklog. [기록하기]를 눌러야 Jira 에 기록된다. 이미 기록한 건 다시 보내지 않는다.
+private struct WorklogCard: View {
+    @ObservedObject var model: AppModel
+    let chat: ChatSession
+    let messageID: UUID
+    let drafts: [WorklogDraft]
+    let done: Set<String>
+    @State private var working = false
+    @State private var error: String?
+
+    private var total: Int { drafts.map(\.minutes).reduce(0, +) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Label("Work log \(drafts.count)건", systemImage: "clock.badge.checkmark").font(.callout.weight(.medium))
+                Text("합계 \(total / 60)시간\(total % 60 > 0 ? " \(total % 60)분" : "")").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(drafts) { draft in
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: done.contains(draft.id) ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(done.contains(draft.id) ? Color.green : Color.secondary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("\(draft.issueKey)\(draft.summary.isEmpty ? "" : " · \(draft.summary)")").font(.callout.weight(.medium))
+                        Text("\(draft.date) \(draft.timeText)\(draft.comment.isEmpty ? "" : " · \(draft.comment)")")
+                            .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            if let error {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
+            HStack {
+                if drafts.allSatisfy({ done.contains($0.id) }) {
+                    Label("Jira 에 기록했어요", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                } else {
+                    Button(action: record) {
+                        if working { ProgressView().controlSize(.small) } else { Text("기록하기") }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(working)
+                }
+            }
+            .padding(.top, 2)
+        }
+        .padding(10)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.4)))
+    }
+
+    private func record() {
+        working = true
+        error = nil
+        Task {
+            for draft in drafts where !done.contains(draft.id) {
+                do {
+                    try await KimbiseoCLI.jiraWorklog(draft, settings: model.settings)
+                    chat.update(messageID) { $0.worklogsDone.append(draft.id) }
+                } catch {
+                    self.error = "\(draft.issueKey) \(draft.start): \(error.localizedDescription)"
+                    break
+                }
+            }
+            working = false
+        }
     }
 }
 

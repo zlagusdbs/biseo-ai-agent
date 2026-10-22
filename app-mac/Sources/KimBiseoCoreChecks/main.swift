@@ -5,6 +5,7 @@ import KimBiseoCore
 // 안내 문구 미리 보기: KIMBISEO_PRINT=rule-hint / jira-hint (기본값 없음) / jira-hint-defaults:<프로젝트키>
 if let what = ProcessInfo.processInfo.environment["KIMBISEO_PRINT"] {
     if what == "rule-hint" { print(RuleProposal.hint); exit(0) }
+    if what == "worklog-hint" { print(WorklogProposal.hint(now: Date(), calendar: .current)); exit(0) }
     let defaults = what.hasPrefix("jira-hint-defaults:") ? JiraDefaults(project: String(what.dropFirst(19))) : nil
     print(JiraProposal.hint(defaults: defaults, now: Date(), calendar: .current))
     exit(0)
@@ -306,6 +307,22 @@ do {
     check((try? Memory.forget("화요일 10시 팀 회의")) == 1 && Memory.items().isEmpty, "memory: 똑같은 줄 잊기")
     try? FileManager.default.removeItem(at: Memory.file)
     if let backup { try? backup.write(to: Memory.file) }
+}
+
+// MARK: Worklog
+do {
+    let reply = "준비했어요.\n```kimbiseo-worklog\n[{\"issueKey\":\"myproj-100\",\"summary\":\"회의\",\"date\":\"2026-10-22\",\"start\":\"10\",\"end\":\"11:30\"},{\"issueKey\":\"A-1\",\"date\":\"2026-10-22\",\"start\":\"14:00\",\"minutes\":0}]\n```"
+    let (text, drafts) = WorklogProposal.extract(from: reply)
+    check(text == "준비했어요." && drafts.count == 1, "worklog: 블록 읽기 (0분은 버림)")
+    let d = drafts[0]
+    check(d.issueKey == "MYPROJ-100" && d.start == "10:00" && d.minutes == 90 && d.timeText == "10:00~11:30 (1시간 30분)", "worklog: end 로 시간 계산")
+    check(d.started(timeZone: TimeZone(identifier: "Asia/Seoul")!) == "2026-10-22T10:00:00.000+0900", "worklog: Jira 시작 시각 형식")
+    let back = (try? JSONEncoder().encode(drafts)).flatMap { try? JSONDecoder().decode([WorklogDraft].self, from: $0) }
+    check(back == drafts, "worklog: 저장 왕복")
+    check(WorklogProposal.looksLikeRequest("회의 jira에 오늘 work log 10-11 등록해줘") && !WorklogProposal.looksLikeRequest("지라 등록해줘"), "worklog: 요청 판단")
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "Asia/Seoul")!
+    let hint = WorklogProposal.hint(now: cal.date(from: DateComponents(year: 2026, month: 10, day: 22))!, calendar: cal)
+    check(WorklogProposal.extract(from: hint).drafts.first?.date == "2026-10-22", "worklog: 안내 예시가 읽힘")
 }
 
 // MARK: AppSettings

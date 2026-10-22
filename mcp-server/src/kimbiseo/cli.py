@@ -4,6 +4,7 @@
   kimbiseo connect --group <그룹>   같은 계정으로 그룹 전체 연결
   kimbiseo status                  시스템별 연결 상태
   kimbiseo github review-requests  내가 리뷰어인 열린 PR (GitHub CLI 로그인 사용)
+  kimbiseo jira worklog            작업 시간 기록. 표준 입력: {"issueKey","started","timeSpentSeconds","comment"} (앱 확인 카드에서만 부름)
   kimbiseo jira create             이슈 등록. 표준 입력: {"project","issueType","summary","description",
                                    "originalEstimate","targetStart","targetEnd","epicLink"} (앱 확인 카드에서만 부름)
   kimbiseo serve                   MCP 서버 (stdio)
@@ -85,6 +86,38 @@ def system_status(system: SystemDef, verifiers: dict[str, Verifier]) -> str:
     return "expired" if credentials.is_expired(system.id) else "connected"
 
 
+def _jira_or_fail(systems: list[SystemDef]) -> JiraClient | None:
+    system = find_system("jira", systems)
+    cred = credentials.load("jira")
+    if system is None or not system.enabled or not system.base_url or cred is None:
+        return None
+    return JiraClient(system.base_url, cred)
+
+
+def jira_worklog(stdin: TextIO, stdout: TextIO, systems: list[SystemDef]) -> int:
+    def fail(code: str, detail: str = "") -> int:
+        print(json.dumps({"error": code, "detail": detail}, ensure_ascii=False), file=stdout)
+        return 1
+
+    try:
+        data = json.loads(stdin.read())
+        key, started, seconds = str(data["issueKey"]).strip(), str(data["started"]).strip(), int(data["timeSpentSeconds"])
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        return fail("BAD_INPUT", str(e))
+    client = _jira_or_fail(systems)
+    if client is None:
+        return fail("NOT_CONNECTED:jira")
+    try:
+        result = client.add_worklog(key, started, seconds, str(data.get("comment") or ""))
+    except AuthExpired as e:
+        credentials.mark_expired("jira")
+        return fail(e.code)
+    except KimbiseoError as e:
+        return fail(e.code, str(e).removeprefix(e.code).strip())
+    print(json.dumps(result, ensure_ascii=False), file=stdout)
+    return 0
+
+
 def jira_create(stdin: TextIO, stdout: TextIO, systems: list[SystemDef]) -> int:
     def fail(code: str, detail: str = "") -> int:
         print(json.dumps({"error": code, "detail": detail}, ensure_ascii=False), file=stdout)
@@ -125,7 +158,7 @@ def main(argv: list[str] | None = None, stdin: TextIO = sys.stdin, stdout: TextI
     github = sub.add_parser("github")
     github.add_argument("action", choices=["review-requests"])
     jira = sub.add_parser("jira")
-    jira.add_argument("action", choices=["create"])
+    jira.add_argument("action", choices=["create", "worklog"])
     sub.add_parser("serve")
     args = parser.parse_args(argv)
 
@@ -167,6 +200,8 @@ def main(argv: list[str] | None = None, stdin: TextIO = sys.stdin, stdout: TextI
         return 0
 
     if args.command == "jira":
+        if args.action == "worklog":
+            return jira_worklog(stdin, stdout, systems)
         return jira_create(stdin, stdout, systems)
 
     if args.command == "status":
