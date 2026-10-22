@@ -64,6 +64,10 @@ struct ChatView: View {
                                                   register: { model.register(message.alarms) },
                                                   open: { model.selected = .alarms })
                             }
+                            if let draft = message.jira {
+                                JiraDraftCard(model: model, chat: chat, messageID: message.id, draft: draft,
+                                              proposedDefaults: message.jiraDefaults, created: message.jiraCreated)
+                            }
                         }
                         if chat.isBusy {
                             HStack(spacing: 8) {
@@ -272,6 +276,136 @@ private struct AlarmProposalCard: View {
         .padding(10)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.4)))
+    }
+}
+
+/// 답변이 제안한 Jira 이슈 초안. [Jira에 등록]을 눌러야 등록되고, [수정]으로 고칠 수 있다.
+private struct JiraDraftCard: View {
+    @ObservedObject var model: AppModel
+    let chat: ChatSession
+    let messageID: UUID
+    let draft: JiraDraft
+    let proposedDefaults: JiraDefaults?
+    let created: JiraCreated?
+    @State private var saveDefaults = true
+    @State private var working = false
+    @State private var error: String?
+    @State private var editing = false
+    @State private var showDescription = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Label("Jira 이슈", systemImage: "square.and.pencil").font(.callout.weight(.medium))
+                Text("\(draft.project) · \(draft.issueType)").font(.caption.weight(.medium))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Color.accentColor.opacity(0.12), in: Capsule())
+            }
+            Text(draft.summary).font(.body.weight(.semibold)).textSelection(.enabled)
+            if !draft.periodText.isEmpty {
+                Label(draft.periodText, systemImage: "calendar").font(.caption).foregroundStyle(.secondary)
+            }
+            if !draft.epicLink.isEmpty {
+                Label("Epic \(draft.epicLink)", systemImage: "link").font(.caption).foregroundStyle(.secondary)
+            }
+            if !draft.description.isEmpty {
+                DisclosureGroup(isExpanded: $showDescription) {
+                    Text(draft.description).font(.caption.monospaced()).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
+                } label: { Text("설명").font(.caption).foregroundStyle(.secondary) }
+            }
+            if let proposedDefaults, created == nil {
+                Toggle(isOn: $saveDefaults) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("이 설정을 기본값으로 저장").font(.caption.weight(.medium))
+                        Text(proposedDefaults.summary(now: Date(), calendar: .current)).font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(.checkbox)
+            }
+            if let error {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
+            HStack {
+                if let created {
+                    Label("\(created.key) 등록했어요", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Button("열기") { if let url = URL(string: created.url) { NSWorkspace.shared.open(url) } }.buttonStyle(.link)
+                } else {
+                    Button(action: create) {
+                        if working { ProgressView().controlSize(.small) } else { Text("Jira에 등록") }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(working)
+                    Button("수정") { editing = true }.disabled(working)
+                }
+            }
+            .padding(.top, 2)
+        }
+        .padding(10)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor.opacity(0.4)))
+        .sheet(isPresented: $editing) {
+            JiraDraftEditor(draft: draft) { edited in chat.update(messageID) { $0.jira = edited } }
+        }
+    }
+
+    private func create() {
+        working = true
+        error = nil
+        Task {
+            do {
+                let result = try await KimbiseoCLI.jiraCreate(draft, settings: model.settings)
+                chat.update(messageID) { $0.jiraCreated = result }
+                if let proposedDefaults, saveDefaults { model.jiraDefaults = proposedDefaults }
+            } catch {
+                self.error = error.localizedDescription
+            }
+            working = false
+        }
+    }
+}
+
+/// 초안 고치기.
+private struct JiraDraftEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @State var draft: JiraDraft
+    let onSave: (JiraDraft) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Jira 이슈 수정").font(.headline)
+            Form {
+                field("프로젝트 키", $draft.project, "예: PRICING")
+                field("이슈 유형", $draft.issueType, "예: Story, Task")
+                field("제목", $draft.summary, "")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("설명 (Jira 위키 문법)").font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $draft.description).font(.body.monospaced()).frame(minHeight: 140)
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
+                }
+                field("Original Estimate", $draft.originalEstimate, "예: 365d, 2w, 4h")
+                field("Target start", $draft.targetStart, "yyyy-MM-dd, 비우면 안 넣음")
+                field("Target end", $draft.targetEnd, "yyyy-MM-dd, 비우면 안 넣음")
+                field("Epic Link", $draft.epicLink, "예: PRICING-100, 비우면 안 넣음")
+            }
+            .formStyle(.grouped)
+            HStack {
+                Spacer()
+                Button("취소") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("저장") { onSave(draft); dismiss() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!draft.isComplete)
+            }
+        }
+        .padding(20)
+        .frame(width: 520, height: 620)
+    }
+
+    private func field(_ title: String, _ text: Binding<String>, _ hint: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            TextField("", text: text, prompt: Text(hint)).textFieldStyle(.roundedBorder).labelsHidden()
+        }
     }
 }
 

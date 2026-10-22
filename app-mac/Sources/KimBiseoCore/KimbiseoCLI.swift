@@ -33,6 +33,18 @@ public enum KimbiseoCLI {
         return try decode([EventItem].self, out)
     }
 
+    /// 이슈 등록. 사용자가 확인 카드에서 [Jira에 등록]을 눌렀을 때만 부른다.
+    public static func jiraCreate(_ draft: JiraDraft, settings: AppSettings) async throws -> JiraCreated {
+        let input = String(decoding: try JSONEncoder().encode(draft), as: UTF8.self)
+        let out = try await run(["jira", "create"], stdin: input, settings: settings)
+        if let created = try? JSONDecoder().decode(JiraCreated.self, from: out.stdout) { return created }
+        struct Failure: Decodable { let error: String; let detail: String? }
+        if let failure = try? JSONDecoder().decode(Failure.self, from: out.stdout) {
+            throw KimbiseoCLIError.failed(JiraFailure.message(code: failure.error, detail: failure.detail ?? ""))
+        }
+        return try decode(JiraCreated.self, out)
+    }
+
     private static func run(_ args: [String], stdin: String?, settings: AppSettings) async throws -> ProcessOutput {
         let out = try await ProcessRunner().run(
             executable: settings.uvPath,
@@ -52,6 +64,19 @@ public enum KimbiseoCLI {
             let err = String(decoding: out.stderr, as: UTF8.self)
             let text = String(decoding: out.stdout, as: UTF8.self)
             throw KimbiseoCLIError.failed((err.isEmpty ? text : err).trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+    }
+}
+
+/// 이슈 등록 실패를 사람이 읽는 말로.
+public enum JiraFailure {
+    public static func message(code: String, detail: String) -> String {
+        switch code {
+        case "NOT_CONNECTED:jira": return "Jira 연결이 필요해요. 연결 메뉴에서 연결해 주세요."
+        case "AUTH_EXPIRED:jira": return "Jira 연결이 만료됐어요. 연결 메뉴에서 다시 연결해 주세요."
+        case "NETWORK_UNREACHABLE:jira": return "사내망 연결을 확인해 주세요."
+        case "REJECTED:jira": return "Jira 가 등록을 거절했어요: \(detail)"
+        default: return detail.isEmpty ? "등록하지 못했어요 (\(code))" : "등록하지 못했어요: \(detail)"
         }
     }
 }

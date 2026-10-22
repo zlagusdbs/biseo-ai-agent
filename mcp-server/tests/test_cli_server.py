@@ -151,3 +151,24 @@ def test_deploy_status_key_changes_with_status(monkeypatch):
         {"id": 316432, "status": "launching", "summary": "차단 스위치"}])
     items = events.fetch("deploy.my_release_status")
     assert items[0]["key"] == "316432:launching"
+
+
+def test_jira_create_cli_bad_input_and_not_connected(monkeypatch):
+    out = io.StringIO()
+    assert cli.main(["jira", "create"], stdin=io.StringIO("{}"), stdout=out) == 1
+    assert json.loads(out.getvalue())["error"] == "BAD_INPUT"
+    out = io.StringIO()
+    body = json.dumps({"project": "PRICING", "issueType": "Story", "summary": "s"})
+    assert cli.main(["jira", "create"], stdin=io.StringIO(body), stdout=out) == 1
+    assert json.loads(out.getvalue())["error"] == "NOT_CONNECTED:jira"
+
+
+def test_jira_create_cli_success(monkeypatch):
+    from kimbiseo.jira_client import Issue, JiraClient
+    save("jira", Credential("u", "p"))
+    monkeypatch.setattr(JiraClient, "create_issue",
+                        lambda self, d: Issue(key="PRICING-1", summary=d.summary, status="", priority=None, due=None, url="https://j/browse/PRICING-1"))
+    out = io.StringIO()
+    body = json.dumps({"project": "PRICING", "issueType": "Story", "summary": "s", "description": "d"})
+    assert cli.main(["jira", "create"], stdin=io.StringIO(body), stdout=out) == 0
+    assert json.loads(out.getvalue()) == {"key": "PRICING-1", "url": "https://j/browse/PRICING-1"}
