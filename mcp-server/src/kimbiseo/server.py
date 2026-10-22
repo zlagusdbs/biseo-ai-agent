@@ -68,6 +68,31 @@ def jira_my_worklogs(date: str = "") -> dict:
     return _with_system("jira", lambda base_url, cred: JiraClient(base_url, cred).my_worklogs(target))
 
 
+def work_day_check(date: str = "") -> dict:
+    """그날(yyyy-MM-dd, 비우면 오늘) HR 유연근무 시간과 내 Jira worklog 합계를 맞춰 본다.
+
+    status: match(같음) | short(worklog 가 모자람, gapMinutes 만큼) | over(더 많음) | unknown(한쪽을 못 읽음).
+    한쪽 시스템이 연결 안 됐으면 그쪽은 null 이고 errors 에 코드가 들어간다.
+    """
+    from .workday import compare
+    target = date or datetime.date.today().isoformat()
+    errors = []
+    hr = _with_system("hr", lambda base_url, cred: HrClient(base_url, cred).flexwork_week(target))
+    hr_day = None
+    if "error" in hr:
+        errors.append(hr["error"])
+    else:
+        hr_day = next((d for d in hr.get("days", []) if d.get("date") == target), None)
+    logs = _with_system("jira", lambda base_url, cred: JiraClient(base_url, cred).my_worklogs(target))
+    if "error" in logs:
+        errors.append(logs["error"])
+        logs = None
+    result = compare(target, hr_day, logs)
+    if errors:
+        result["errors"] = errors
+    return result
+
+
 def wiki_search(query: str, limit: int = 10) -> dict:
     """사내 Wiki(Confluence) 페이지를 검색어로 찾는다. 결과의 id 로 wiki_get_page 를 호출하면 본문을 읽을 수 있다."""
     def work(base_url: str, cred: Credential) -> dict:
@@ -121,7 +146,7 @@ def github_review_requests() -> dict:
     return _with_system("github", lambda base_url, cred: {"pullRequests": github_client.review_requests(base_url)})
 
 
-TOOLS = [jira_search, jira_projects, jira_my_worklogs, wiki_search, wiki_get_page, hr_holidays, hr_flexwork_week,
+TOOLS = [jira_search, jira_projects, jira_my_worklogs, work_day_check, wiki_search, wiki_get_page, hr_holidays, hr_flexwork_week,
          deploy_my_releases, deploy_approvals, deploy_domain_releases, deploy_release_search, github_review_requests]
 for _tool in TOOLS:
     mcp.tool()(_tool)
