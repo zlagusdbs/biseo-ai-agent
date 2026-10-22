@@ -1,8 +1,11 @@
 [
-  {"id": "jira", "name": "Jira", "group": "ad", "enabled": true, "baseUrl": "https://jira.example.com"},
-  {"id": "wiki", "name": "Wiki", "group": "ad", "enabled": true, "baseUrl": "https://wiki.example.com"},
-  {"id": "hr", "name": "HR", "group": "ad", "enabled": true, "baseUrl": "https://hr.example.com"},
-  {"id": "deploy", "name": "Deploy", "group": "ad", "enabled": true, "baseUrl": "http://deploy-api.example.com", "webUrl": "http://deploy.example.com"},
-  {"id": "github", "name": "GitHub", "group": "github", "enabled": true, "baseUrl": "https://github.example.com", "auth": "gh"},
-  {"id": "groupware", "name": "Groupware", "group": "groupware", "enabled": false, "baseUrl": null}
+  {"id": "jira", "name": "Jira", "group": "ad", "enabled": true, "baseUrl": "https://jira.example.com", "company": "Company A"},
+  {"id": "wiki", "name": "Wiki", "group": "ad", "enabled": true, "baseUrl": "https://wiki.example.com", "company": "Company A"},
+  {"id": "hr", "name": "HR", "group": "ad", "enabled": true, "baseUrl": "https://hr.example.com", "company": "Company A"},
+  {"id": "deploy", "name": "Deploy", "group": "ad", "enabled": true, "baseUrl": "http://deploy-api.example.com", "webUrl": "http://deploy.example.com", "company": "Company A"},
+  {"id": "approval", "name": "Approval", "group": "ad", "enabled": true, "baseUrl": "https://approval.example.com", "company": "Company A", "loginDomain": "EXAMPLE"},
+  {"id": "permit", "name": "Permit", "group": "ad", "enabled": true, "baseUrl": "https://permit.example.com", "company": "Company A"},
+  {"id": "github", "name": "GitHub", "group": "github", "enabled": true, "baseUrl": "https://github.example.com", "auth": "gh", "company": "Company A"},
+  {"id": "microsoft365", "name": "Microsoft 365", "group": "claude", "enabled": true, "baseUrl": null, "auth": "claude.ai", "company": "Company A"},
+  {"id": "groupware", "name": "Groupware", "group": "groupware", "enabled": false, "baseUrl": null, "company": "Company B"}
 ]

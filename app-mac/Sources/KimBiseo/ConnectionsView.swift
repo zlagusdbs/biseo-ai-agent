@@ -21,42 +21,13 @@ struct ConnectionsView: View {
             Divider()
 
             List {
-                ForEach(model.systems.filter { $0.status != .unavailable }) { system in
-                    HStack {
-                        Text(system.name).frame(width: 110, alignment: .leading)
-                        statusLabel(system.status)
-                        Spacer()
-                        Button(system.status == .disconnected ? "연결" : "다시 연결") {
-                            if system.auth == "gh" {
-                                githubHost = GitHubHost(host: URL(string: system.baseUrl ?? "")?.host ?? "github.com")
-                            } else {
-                                loginTarget = LoginTarget(target: .system(system.system), title: system.name)
-                            }
+                // connections 파일의 company 로 묶는다 (처음 나온 순서). 회사 이름은 로컬 파일에만 있다.
+                ForEach(companies, id: \.self) { company in
+                    Section(company) {
+                        ForEach(model.systems.filter { ($0.company ?? "기타") == company }) { system in
+                            row(system)
                         }
                     }
-                    .padding(.vertical, 4)
-                }
-                // claude.ai 커넥터: 연결·해제는 claude.ai 설정에서 한다.
-                HStack {
-                    Text("Microsoft 365").frame(width: 110, alignment: .leading)
-                    if let status = model.microsoft365 {
-                        statusLabel(status == .connected ? .connected : .disconnected)
-                    } else {
-                        ProgressView().controlSize(.small)
-                        Text("확인 중").foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button("설정 열기") { NSWorkspace.shared.open(ConnectorStatus.settingsURL) }
-                        .help("claude.ai 커넥터 설정에서 Microsoft 365 를 연결·해제해요")
-                }
-                .padding(.vertical, 4)
-                ForEach(model.systems.filter { $0.status == .unavailable }) { system in
-                    HStack {
-                        Text(system.name).frame(width: 110, alignment: .leading)
-                        Spacer()
-                        Text("준비 중").foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
                 }
             }
 
@@ -92,13 +63,53 @@ struct ConnectionsView: View {
         }
     }
 
+    private var companies: [String] {
+        var seen: [String] = []
+        for system in model.systems where !seen.contains(system.company ?? "기타") { seen.append(system.company ?? "기타") }
+        return seen
+    }
+
+    @ViewBuilder
+    private func row(_ system: SystemStatus) -> some View {
+        HStack {
+            Text(system.name).frame(width: 110, alignment: .leading)
+            switch system.status {
+            case .unavailable:
+                Spacer()
+                Text("준비 중").foregroundStyle(.secondary)
+            case .external:
+                // claude.ai 커넥터: 연결·해제는 claude.ai 설정에서 한다.
+                if let status = model.microsoft365 {
+                    statusLabel(status == .connected ? .connected : .disconnected)
+                } else {
+                    ProgressView().controlSize(.small)
+                    Text("확인 중").foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("설정 열기") { NSWorkspace.shared.open(ConnectorStatus.settingsURL) }
+                    .help("claude.ai 커넥터 설정에서 Microsoft 365 를 연결·해제해요")
+            default:
+                statusLabel(system.status)
+                Spacer()
+                Button(system.status == .disconnected ? "연결" : "다시 연결") {
+                    if system.auth == "gh" {
+                        githubHost = GitHubHost(host: URL(string: system.baseUrl ?? "")?.host ?? "github.com")
+                    } else {
+                        loginTarget = LoginTarget(target: .system(system.system), title: system.name)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
     @ViewBuilder
     private func statusLabel(_ status: SystemStatus.Status) -> some View {
         switch status {
         case .connected: Label("연결됨", systemImage: "circle.fill").foregroundStyle(.green)
         case .disconnected: Label("연결 안 됨", systemImage: "circle").foregroundStyle(.secondary)
         case .expired: Label("만료됨", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-        case .unavailable: EmptyView()
+        case .unavailable, .external: EmptyView()
         }
     }
 }
