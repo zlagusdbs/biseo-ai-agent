@@ -256,10 +256,7 @@ do {
     check(ClaudeAccount.parse(Data(#"{"loggedIn":false}"#.utf8))?.display == "로그인 안 됨", "account: 로그인 안 됨")
     let limit = #"{"type":"result","is_error":true,"result":"You've hit your individual spend limit · run /usage-credits to ask your admin for a higher limit"}"#
     check(ClaudeResponse.parse(stdout: Data(limit.utf8), exitCode: 1) == .failure(.usageLimit), "account: 개인 사용 한도 오류")
-    var s = AppSettings.default
-    check(AppPaths.processEnvironment(settings: s)["CLAUDE_CONFIG_DIR"] == nil, "account: 기본은 공유 로그인")
-    s.separateClaudeLogin = true
-    check(AppPaths.processEnvironment(settings: s)["CLAUDE_CONFIG_DIR"] == AppPaths.claudeConfigDir.path, "account: 전용 로그인은 따로 폴더")
+    check(AppPaths.processEnvironment(settings: .default)["CLAUDE_CONFIG_DIR"] == AppPaths.claudeConfigDir.path, "account: 김비서는 항상 전용 로그인 폴더")
 }
 
 // MARK: Rules

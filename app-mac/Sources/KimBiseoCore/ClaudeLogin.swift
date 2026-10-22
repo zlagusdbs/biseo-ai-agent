@@ -31,9 +31,8 @@ public final class ClaudeLogin: @unchecked Sendable {
         return ClaudeAccount.parse(out.stdout)
     }
 
-    /// 로그아웃. 김비서 전용 로그인일 때만 부른다 (공유 로그인이면 터미널 Claude Code 도 로그아웃되므로).
+    /// 김비서 전용 로그인에서 로그아웃 (터미널 Claude Code 로그인은 그대로).
     public static func logout(settings: AppSettings) async {
-        guard settings.separateClaudeLogin else { return }
         _ = try? await ProcessRunner().run(executable: settings.claudePath, arguments: ["auth", "logout"],
                                            environment: AppPaths.processEnvironment(settings: settings), timeout: 20)
     }
