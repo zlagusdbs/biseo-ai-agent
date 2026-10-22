@@ -6,6 +6,19 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
+        // 다른 탭처럼 위에 제목 줄을 둔다. 없으면 스크롤한 내용이 창 왼쪽 위 닫기·최소화 버튼 밑까지 올라간다.
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("설정").font(.headline)
+                Spacer()
+            }
+            .padding(12)
+            Divider()
+            form
+        }
+    }
+
+    private var form: some View {
         Form {
             Section("이름") {
                 TextField("주인 이름", text: $model.settings.ownerName, prompt: Text("김비서가 부를 이름"))
