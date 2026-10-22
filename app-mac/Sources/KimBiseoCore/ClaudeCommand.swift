@@ -3,6 +3,7 @@ import Foundation
 /// `claude -p` 실행 인자. 허용 도구 목록(김비서 MCP + Microsoft 365 조회)만 쓰도록 제한한다.
 public enum ClaudeCommand {
     public static let allowedTools = [
+        "mcp__kimbiseo__read_rule",
         "mcp__kimbiseo__jira_search",
         "mcp__kimbiseo__jira_projects",
         "mcp__kimbiseo__jira_my_worklogs",

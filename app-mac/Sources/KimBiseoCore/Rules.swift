@@ -32,15 +32,73 @@ public enum Rules {
         return (top + rules).map { File(url: $0) }
     }
 
-    /// 시스템 안내에 붙일 rules/*.md. CLAUDE.md 는 Claude Code 가 읽으므로 넣지 않는다. 규칙이 없으면 빈 문자열.
-    public static func prompt() -> String {
-        let parts = files().filter { $0.url != claudeMd }.compactMap { file -> String? in
-            guard let text = try? String(contentsOf: file.url, encoding: .utf8),
-                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-            return "## \(file.name)\n\(text.trimmingCharacters(in: .whitespacesAndNewlines))"
+    /// 규칙 파일 하나의 머리말. 파일 맨 위에 이렇게 적는다 (없으면 제목 줄과 파일 이름으로 대신함).
+    ///     ---
+    ///     description: Jira 이슈 등록·worklog·기본값
+    ///     keywords: jira, 지라, 이슈, worklog
+    ///     always: false
+    ///     ---
+    public struct Info: Equatable {
+        public let name: String          // rules/jira.md
+        public let description: String
+        public let keywords: [String]
+        public let always: Bool          // 질문과 상관없이 늘 붙임 (memory.md 기본)
+        public let body: String          // 머리말을 뺀 본문
+
+        public static func parse(name: String, text: String) -> Info {
+            var meta: [String: String] = [:]
+            var body = text
+            let lines = text.components(separatedBy: "\n")
+            if lines.first?.trimmingCharacters(in: .whitespaces) == "---",
+               let end = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" }) {
+                for line in lines[1..<end] {
+                    let parts = line.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+                    if parts.count == 2 { meta[parts[0].lowercased()] = parts[1] }
+                }
+                body = lines[(end + 1)...].joined(separator: "\n")
+            }
+            body = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            let stem = (name as NSString).lastPathComponent.replacingOccurrences(of: ".md", with: "")
+            let heading = body.components(separatedBy: "\n").first { $0.hasPrefix("# ") }.map { String($0.dropFirst(2)) }
+            let keywords = (meta["keywords"]?.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() } ?? [])
+                .filter { !$0.isEmpty }
+            return Info(name: name,
+                        description: meta["description"] ?? heading ?? stem,
+                        keywords: keywords.isEmpty ? [stem.lowercased()] : keywords,
+                        always: meta["always"].map { $0.lowercased() == "true" } ?? (stem == "memory"),
+                        body: body)
         }
-        guard !parts.isEmpty else { return "" }
-        return "\n\n# 사용자 규칙 (김비서 폴더의 rules/*.md)\n\n" + parts.joined(separator: "\n\n") + "\n"
+
+        /// 질문에 키워드가 들어 있으면 이 규칙이 필요하다고 본다 (띄어쓰기·대소문자 무시).
+        public func matches(_ message: String) -> Bool {
+            let compact = message.replacingOccurrences(of: " ", with: "").lowercased()
+            return always || keywords.contains { compact.contains($0.replacingOccurrences(of: " ", with: "")) }
+        }
+    }
+
+    public static func infos() -> [Info] {
+        files().filter { $0.url != claudeMd }.compactMap { file in
+            (try? String(contentsOf: file.url, encoding: .utf8)).map { Info.parse(name: file.name, text: $0) }
+        }
+    }
+
+    /// 시스템 안내에 붙일 규칙. 모든 규칙의 한 줄 설명(목록)은 늘 붙이고, 본문은 질문에 맞는 것만 붙인다
+    /// (규칙이 많아져도 질문마다 읽는 양이 늘지 않게). 나머지는 Claude 가 read_rule 로 필요할 때 읽는다.
+    /// CLAUDE.md 는 Claude Code 가 스스로 읽으므로 넣지 않는다.
+    public static func prompt(for message: String) -> String {
+        render(infos(), message: message)
+    }
+
+    public static func render(_ infos: [Info], message: String) -> String {
+        guard !infos.isEmpty else { return "" }
+        let index = infos.map { "- \($0.name): \($0.description)" }.joined(separator: "\n")
+        let attached = infos.filter { $0.matches(message) && !$0.body.isEmpty }
+        var text = "\n\n# 사용자 규칙 (김비서 폴더의 rules/*.md)\n\n규칙 목록:\n\(index)\n"
+        text += "아래에 본문이 없는 규칙이 이번 질문에 필요하면 read_rule 도구로 읽고 따른다.\n"
+        for info in attached {
+            text += "\n## \(info.name)\n\(info.body)\n"
+        }
+        return text
     }
 
     /// 처음 실행할 때 템플릿을 복사한다. 이미 있는 파일은 건드리지 않는다. 복사한 파일 수.

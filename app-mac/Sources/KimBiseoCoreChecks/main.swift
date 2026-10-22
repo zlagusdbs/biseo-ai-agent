@@ -5,6 +5,7 @@ import KimBiseoCore
 // 안내 문구 미리 보기: KIMBISEO_PRINT=rule-hint / worklog-hint / hints(KIMBISEO_TEXT) / jira-hint
 if let what = ProcessInfo.processInfo.environment["KIMBISEO_PRINT"] {
     if what == "rule-hint" { print(RuleProposal.hint); exit(0) }
+    if what == "rules" { print(Rules.prompt(for: ProcessInfo.processInfo.environment["KIMBISEO_TEXT"] ?? "")); exit(0) }
     if what == "hints" {   // KIMBISEO_TEXT 의 문장에 붙을 안내 전체
         let text = ProcessInfo.processInfo.environment["KIMBISEO_TEXT"] ?? ""
         print(ChatHints.for(text, now: Date(), calendar: .current)); exit(0)
@@ -230,6 +231,7 @@ do {
     let (text, draft) = JiraProposal.extract(from: reply)
     check(text == "초안이에요." && draft?.summary == "쿠폰 정리" && draft?.originalEstimate == "" && draft?.targetEnd == "2026-12-31", "jira: 초안 읽기 (빠진 항목은 빈칸)")
     check(JiraProposal.extract(from: "```kimbiseo-jira\n{\"issue\":{\"project\":\"P\"}}\n```").draft == nil, "jira: 제목·유형 없는 초안은 버림")
+    check(JiraProposal.extract(from: "```kimbiseo-jira\n{\"project\":\"P\",\"issueType\":\"Story\",\"summary\":\"s\"}\n```").draft?.project == "P", "jira: 감싸지 않은 초안도 읽음")
     let hint = JiraProposal.hint(now: now, calendar: cal)
     check(hint.contains("오늘은 2026-10-22, 올해 마지막 날은 2026-12-31") && hint.contains("[사용자 규칙]의 Jira 규칙")
           && hint.contains("kimbiseo-rule") && !hint.contains("\\("), "jira: 규칙을 따르라는 안내 (날짜 계산됨)")
@@ -258,7 +260,17 @@ do {
     check(Rules.safeName("Wiki 규칙.md") == "wiki규칙" && Rules.safeName("!!") == "memory", "rules: 파일 이름 정리")
     check(Rules.File(url: Rules.myDir.appendingPathComponent("jira.md")).name == "rules/jira.md"
           && Rules.File(url: Rules.claudeMd).name == "CLAUDE.md", "rules: 김비서 폴더 기준 이름")
-    check(!Rules.prompt().contains("## CLAUDE.md"), "rules: CLAUDE.md 는 Claude Code 가 읽으므로 안 붙임")
+    check(!Rules.prompt(for: "아무 질문").contains("## CLAUDE.md"), "rules: CLAUDE.md 는 Claude Code 가 읽으므로 안 붙임")
+    let jira = Rules.Info.parse(name: "rules/jira.md", text: "---\ndescription: Jira 이슈 등록·worklog\nkeywords: jira, 지라, work log\n---\n# Jira 규칙\n- 프로젝트 키: X")
+    let wiki = Rules.Info.parse(name: "rules/wiki.md", text: "# 위키 검색 규칙\n- 공간은 PRICE")
+    let memory = Rules.Info.parse(name: "rules/memory.md", text: "# memory\n- 팀은 가격팀")
+    check(jira.description == "Jira 이슈 등록·worklog" && jira.body == "# Jira 규칙\n- 프로젝트 키: X" && !jira.always, "rules: 머리말 읽기")
+    check(wiki.description == "위키 검색 규칙" && wiki.keywords == ["wiki"] && memory.always, "rules: 머리말 없으면 제목·파일 이름, memory 는 늘")
+    check(jira.matches("회의 WorkLog 10-11") && jira.matches("지라 등록해줘") && !jira.matches("오늘 메일 요약"), "rules: 키워드로 판단")
+    let p = Rules.render([jira, wiki, memory], message: "지라 등록해줘")
+    check(p.contains("- rules/wiki.md: 위키 검색 규칙") && p.contains("## rules/jira.md\n# Jira 규칙") && !p.contains("공간은 PRICE")
+          && p.contains("팀은 가격팀") && p.contains("read_rule"), "rules: 목록은 늘, 본문은 맞는 것만")
+    check(!Rules.render([jira, wiki], message: "오늘 메일 요약").contains("프로젝트 키"), "rules: 상관없는 질문엔 본문 없음")
     let reply = "알겠어요.\n```kimbiseo-rule\n[{\"file\":\"jira\",\"text\":\"제목 앞에 [회의]\"},{\"file\":\"memory\",\"text\":\" \"}]\n```"
     let (text, notes) = RuleProposal.extract(from: reply)
     check(text == "알겠어요." && notes == [RuleNote(file: "jira", text: "제목 앞에 [회의]")], "rules: 제안 읽기 (빈 줄은 버림)")

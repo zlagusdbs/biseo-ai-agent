@@ -71,8 +71,11 @@ public enum JiraProposal {
         let range = NSRange(text.startIndex..., in: text)
         var draft: JiraDraft?
         if let match = block.firstMatch(in: text, range: range), let body = Range(match.range(at: 1), in: text),
-           let parsed = try? JSONDecoder().decode(Block.self, from: Data(text[body].utf8)) {
-            draft = parsed.issue.flatMap { $0.isComplete ? $0 : nil }
+           let data = Optional(Data(text[body].utf8)) {
+            // {"issue":{...}} 가 기본이지만, 안내 없이 규칙만 보고 만들면 감싸지 않은 초안이 올 때도 있다
+            let issue = (try? JSONDecoder().decode(Block.self, from: data))?.issue
+                ?? (try? JSONDecoder().decode(JiraDraft.self, from: data))
+            draft = issue.flatMap { $0.isComplete ? $0 : nil }
         }
         let clean = block.stringByReplacingMatches(in: text, range: range, withTemplate: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
