@@ -1,3 +1,7 @@
+---
+description: Jira 이슈 등록·worklog 기록·담당자·우리 팀 기본값(프로젝트 키, 기간, 고정 이슈)
+keywords: jira, 지라, 이슈, 티켓, 일감, story, task, epic, 에픽, worklog, 워크로그, 로그워크, 작업시간, 회의, cs, 문의, 담당자, 어싸인, assign, worklogcal, 워크로그 캘린더, 근무시간, 맞춰, 뭐했
+---
 # Jira 규칙
 
 - 담당자·보고자는 등록하는 사람 본인이다. 앱이 [Jira에 등록]을 누를 때 자동으로 넣으니 못 한다고 말하지 않는다.
