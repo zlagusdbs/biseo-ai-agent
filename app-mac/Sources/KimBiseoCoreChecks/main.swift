@@ -169,6 +169,14 @@ do {
     let a = EventItem(key: "1", title: "a", summary: "", url: ""), b = EventItem(key: "2", title: "b", summary: "", url: "")
     check(TriggerDiff.newItems(current: [a, b], seen: nil).isEmpty, "trigger: 처음엔 기준만 잡고 알리지 않음")
     check(TriggerDiff.newItems(current: [a, b], seen: ["1"]) == [b], "trigger: 새 항목만")
+    let t5 = Trigger(system: "github", event: "e")
+    let t1 = Trigger(system: "github", event: "e", intervalMinutes: 1)
+    let base = Date(timeIntervalSince1970: 1_000_000)
+    check(t5.interval == 5 && t5.isDue(lastChecked: nil, now: base) && !t5.isDue(lastChecked: base, now: base.addingTimeInterval(240))
+          && t5.isDue(lastChecked: base, now: base.addingTimeInterval(298)) && t1.isDue(lastChecked: base, now: base.addingTimeInterval(60)),
+          "trigger: 주기 판단 (기본 5분, 1분)")
+    let oldTrigger = #"{"system":"github","event":"e"}"#
+    check((try? JSONDecoder().decode(Trigger.self, from: Data(oldTrigger.utf8)))?.interval == 5, "trigger: 예전 트리거는 5분")
     check(TriggerEvent.events(for: "github").count == 3 && TriggerEvent.systems == ["github", "deploy", "jira"], "trigger: 이벤트 목록")
 }
 

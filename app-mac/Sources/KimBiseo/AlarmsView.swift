@@ -219,7 +219,7 @@ extension AlarmsView {
         VStack(alignment: .leading, spacing: 4) {
             if let trigger = alarm.trigger {
                 HStack(spacing: 4) {
-                    Text("트리거 · \(SystemNames.name(trigger.system)) · \(TriggerEvent.find(trigger.event)?.name ?? trigger.event)")
+                    Text("트리거 · \(SystemNames.name(trigger.system)) · \(TriggerEvent.find(trigger.event)?.name ?? trigger.event) · \(trigger.interval)분마다")
                     TriggerHelpIcon()
                 }
             } else {
@@ -287,6 +287,7 @@ struct AlarmEditor: View {
     @State private var mode: Mode
     @State private var triggerSystem: String
     @State private var triggerEvent: String
+    @State private var triggerInterval: Int
     let systems: [SystemStatus]
     @State private var time: Date
     @State private var kind: RepeatKind
@@ -304,6 +305,7 @@ struct AlarmEditor: View {
         let system = alarm.trigger?.system ?? TriggerEvent.systems[0]
         _triggerSystem = State(initialValue: system)
         _triggerEvent = State(initialValue: alarm.trigger?.event ?? TriggerEvent.events(for: system)[0].id)
+        _triggerInterval = State(initialValue: alarm.trigger?.interval ?? Trigger.defaultInterval)
         let cal = Calendar.current
         _time = State(initialValue: cal.date(bySettingHour: alarm.hour, minute: alarm.minute, second: 0, of: Date()) ?? Date())
         switch alarm.repeatRule {
@@ -346,6 +348,9 @@ struct AlarmEditor: View {
                             ForEach(TriggerEvent.events(for: triggerSystem)) { Text($0.name).tag($0.id) }
                         }
                         .onChange(of: triggerEvent) { autoTitle() }
+                        Picker("확인 주기", selection: $triggerInterval) {
+                            ForEach(Trigger.intervals, id: \.self) { Text("\($0)분마다").tag($0) }
+                        }
                         if systems.first(where: { $0.system == triggerSystem })?.status != .connected {
                             Text("\(SystemNames.name(triggerSystem)) 이(가) 연결돼 있지 않아요. 연결 메뉴에서 먼저 연결해 주세요.")
                                 .font(.caption).foregroundStyle(.orange)
@@ -452,7 +457,7 @@ struct AlarmEditor: View {
 
     private func save() {
         if mode == .trigger {
-            alarm.trigger = Trigger(system: triggerSystem, event: triggerEvent)
+            alarm.trigger = Trigger(system: triggerSystem, event: triggerEvent, intervalMinutes: triggerInterval)
             if alarm.prompt == Alarm.dailyReportPrompt { alarm.prompt = "" }
             onSave(alarm)
             dismiss()
@@ -484,7 +489,7 @@ enum SystemNames {
 /// 트리거 설명 아이콘.
 struct TriggerHelpIcon: View {
     var body: some View {
-        HelpIcon(text: "켜져 있는 동안 5분마다 확인해서, 새로 생긴 것만 알려 드려요.\n처음 켤 때 이미 있던 건 알리지 않아요.")
+        HelpIcon(text: "켜져 있는 동안 정한 주기(기본 5분)마다 확인해서, 새로 생긴 것만 알려 드려요.\n처음 켤 때 이미 있던 건 알리지 않아요. 바로 보고 싶으면 ▶(지금 확인)을 누르세요.\n내용을 비워 두면 바로 알리고, 내용을 적으면 김비서가 그 일을 한 뒤 결과를 알려요(조금 느림).")
     }
 }
 
