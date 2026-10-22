@@ -222,6 +222,7 @@ do {
     check(d.startDate(now: now, calendar: cal) == "2026-10-22" && d.endDate(now: now, calendar: cal) == "2026-12-31", "jira: 오늘·올해 마지막 날")
     check(JiraDefaults(project: "P", targetStart: .none, targetEnd: .none).endDate(now: now, calendar: cal).isEmpty, "jira: 날짜 없음 규칙")
     check(JiraProposal.looksLikeRequest("지라 등록해줘: 쿠폰 API 정리") && JiraProposal.looksLikeRequest("Jira 이슈 하나 만들어줘")
+          && JiraProposal.looksLikeRequest("다시 담당자 내이름으로") && JiraProposal.looksLikeRequest("어싸인은 나지 ?")
           && !JiraProposal.looksLikeRequest("내 미완료 Jira 알려줘") && !JiraProposal.looksLikeRequest("매일 9시 알림 등록"), "jira: 등록 요청 판단")
     let reply = "초안이에요.\n```kimbiseo-jira\n{\"issue\":{\"project\":\"PRICING\",\"issueType\":\"Story\",\"summary\":\" 쿠폰 정리 \",\"description\":\"h3. 배경\",\"targetEnd\":\"2026-12-31\"},\"defaults\":{\"project\":\"PRICING\",\"targetStart\":\"today\"}}\n```"
     let (text, draft, defaults) = JiraProposal.extract(from: reply)
