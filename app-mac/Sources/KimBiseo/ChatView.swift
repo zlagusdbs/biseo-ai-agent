@@ -82,7 +82,7 @@ struct ChatView: View {
                             }
                             if let draft = message.jira {
                                 JiraDraftCard(model: model, chat: chat, messageID: message.id, draft: draft,
-                                              proposedDefaults: message.jiraDefaults, created: message.jiraCreated)
+                                              created: message.jiraCreated)
                             }
                         }
                         if chat.isBusy {
@@ -307,9 +307,7 @@ private struct JiraDraftCard: View {
     let chat: ChatSession
     let messageID: UUID
     let draft: JiraDraft
-    let proposedDefaults: JiraDefaults?
     let created: JiraCreated?
-    @State private var saveDefaults = true
     @State private var working = false
     @State private var error: String?
     @State private var editing = false
@@ -336,15 +334,6 @@ private struct JiraDraftCard: View {
                     Text(draft.description).font(.caption.monospaced()).textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 4)
                 } label: { Text("설명").font(.caption).foregroundStyle(.secondary) }
-            }
-            if let proposedDefaults, created == nil {
-                Toggle(isOn: $saveDefaults) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("이 설정을 기본값으로 저장").font(.caption.weight(.medium))
-                        Text(proposedDefaults.summary(now: Date(), calendar: .current)).font(.caption2).foregroundStyle(.secondary)
-                    }
-                }
-                .toggleStyle(.checkbox)
             }
             if let error {
                 Text(error).font(.caption).foregroundStyle(.red)
@@ -379,7 +368,6 @@ private struct JiraDraftCard: View {
             do {
                 let result = try await KimbiseoCLI.jiraCreate(draft, settings: model.settings)
                 chat.update(messageID) { $0.jiraCreated = result }
-                if let proposedDefaults, saveDefaults { model.jiraDefaults = proposedDefaults }
             } catch {
                 self.error = error.localizedDescription
             }

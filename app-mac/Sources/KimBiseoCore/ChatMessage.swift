@@ -11,9 +11,8 @@ public struct ChatMessage: Identifiable, Codable, Equatable {
     public let images: [String]
     /// 답변이 등록을 제안한 알림 (사용자가 버튼을 눌러야 등록된다)
     public let alarms: [Alarm]
-    /// 답변이 제안한 Jira 이슈 초안 (카드에서 고칠 수 있음), 함께 제안한 기본값, 등록 결과
+    /// 답변이 제안한 Jira 이슈 초안 (카드에서 고칠 수 있음)과 등록 결과
     public var jira: JiraDraft?
-    public var jiraDefaults: JiraDefaults?
     public var jiraCreated: JiraCreated?
     /// 답변이 제안한 규칙과 저장 여부
     public var rules: [RuleNote] = []
@@ -23,7 +22,7 @@ public struct ChatMessage: Identifiable, Codable, Equatable {
     public var worklogsDone: [String] = []
 
     public init(id: UUID = UUID(), role: Role, text: String, date: Date = Date(), images: [String] = [], alarms: [Alarm] = [],
-                jira: JiraDraft? = nil, jiraDefaults: JiraDefaults? = nil) {
+                jira: JiraDraft? = nil) {
         self.id = id
         self.role = role
         self.text = text
@@ -31,7 +30,6 @@ public struct ChatMessage: Identifiable, Codable, Equatable {
         self.images = images
         self.alarms = alarms
         self.jira = jira
-        self.jiraDefaults = jiraDefaults
     }
 
     /// 예전 대화 기록(images·alarms 없음)도 읽는다.
@@ -44,7 +42,6 @@ public struct ChatMessage: Identifiable, Codable, Equatable {
         images = try c.decodeIfPresent([String].self, forKey: .images) ?? []
         alarms = try c.decodeIfPresent([Alarm].self, forKey: .alarms) ?? []
         jira = try c.decodeIfPresent(JiraDraft.self, forKey: .jira)
-        jiraDefaults = try c.decodeIfPresent(JiraDefaults.self, forKey: .jiraDefaults)
         jiraCreated = try c.decodeIfPresent(JiraCreated.self, forKey: .jiraCreated)
         rules = try c.decodeIfPresent([RuleNote].self, forKey: .rules) ?? []
         rulesSaved = try c.decodeIfPresent(Bool.self, forKey: .rulesSaved) ?? false

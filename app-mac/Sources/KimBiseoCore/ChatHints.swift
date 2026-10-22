@@ -3,12 +3,12 @@ import Foundation
 /// 질문 끝에 몰래 붙이는 김비서 앱 안내 모음. 해당하는 안내를 모두 붙인다
 /// ("worklog 맞춰봐 알림 등록해줘" 는 알림과 worklog 둘 다에 걸림). 알림 등록이 가장 흔한 오해라 맨 앞에 둔다.
 public enum ChatHints {
-    public static func `for`(_ text: String, jiraDefaults: JiraDefaults?, now: Date, calendar: Calendar) -> String {
+    public static func `for`(_ text: String, now: Date, calendar: Calendar) -> String {
         var hints: [String] = []
         if AlarmProposal.looksLikeRequest(text) { hints.append(AlarmProposal.hint) }
         if WorklogProposal.looksLikeRequest(text) { hints.append(WorklogProposal.hint(now: now, calendar: calendar)) }
         if JiraProposal.looksLikeRequest(text) {
-            hints.append(JiraProposal.hint(defaults: jiraDefaults, now: now, calendar: calendar))
+            hints.append(JiraProposal.hint(now: now, calendar: calendar))
         }
         if RuleProposal.looksLikeRequest(text) { hints.append(RuleProposal.hint) }
         guard hints.count > 1 else { return hints.first ?? "" }

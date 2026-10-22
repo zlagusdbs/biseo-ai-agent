@@ -27,11 +27,9 @@ final class ChatSession: ObservableObject {
     private let runner = ClaudeRunner()
     private let login = ClaudeLogin()
     private let settings: () -> AppSettings
-    private let jiraDefaults: () -> JiraDefaults?
 
-    init(settings: @escaping () -> AppSettings, jiraDefaults: @escaping () -> JiraDefaults? = { nil }) {
+    init(settings: @escaping () -> AppSettings) {
         self.settings = settings
-        self.jiraDefaults = jiraDefaults
         if let data = try? Data(contentsOf: AppPaths.chatFile),
            let stored = try? JSONDecoder().decode(Stored.self, from: data) {
             messages = stored.messages
@@ -44,7 +42,7 @@ final class ChatSession: ObservableObject {
         guard !trimmed.isEmpty || !images.isEmpty else { return }
         if trimmed.isEmpty { trimmed = "이 이미지를 보고 설명해줘." }
         append(ChatMessage(role: .user, text: text.trimmingCharacters(in: .whitespacesAndNewlines), images: images.map(\.path)))
-        trimmed += ChatHints.for(trimmed, jiraDefaults: jiraDefaults(), now: Date(), calendar: .current)
+        trimmed += ChatHints.for(trimmed, now: Date(), calendar: .current)
         queue.append(.chat(trimmed, images))
         processNext()
     }
@@ -111,10 +109,10 @@ final class ChatSession: ObservableObject {
         case .success(let text, let newSession):
             if !newSession.isEmpty { sessionId = newSession }
             let (afterAlarms, alarms) = AlarmProposal.extract(from: text)
-            let (afterJira, jira, defaults) = JiraProposal.extract(from: afterAlarms)
+            let (afterJira, jira) = JiraProposal.extract(from: afterAlarms)
             let (afterRules, rules) = RuleProposal.extract(from: afterJira)
             let (clean, worklogs) = WorklogProposal.extract(from: afterRules)
-            var message = ChatMessage(role: .assistant, text: clean, alarms: alarms, jira: jira, jiraDefaults: defaults)
+            var message = ChatMessage(role: .assistant, text: clean, alarms: alarms, jira: jira)
             message.rules = rules
             message.worklogs = worklogs
             append(message)
