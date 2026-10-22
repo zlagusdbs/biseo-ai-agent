@@ -1,7 +1,7 @@
 import Foundation
 import KimBiseoCore
 
-/// 트리거 알림 확인기. 5분마다 켜진 트리거 알림의 이벤트를 조회해서 새로 생긴 항목만 알린다.
+/// 트리거 알림 확인기. 1분마다 깨어나서, 알림마다 정한 주기(기본 5분)가 지난 트리거의 이벤트를 조회해 새로 생긴 항목만 알린다.
 /// 내용(prompt)이 있으면 김비서가 그 일을 해서 결과를 카드로, 없으면 이벤트 자체를 카드로 보여 준다.
 @MainActor
 final class TriggerWatcher {
@@ -10,6 +10,8 @@ final class TriggerWatcher {
     private let reminders: ReminderCenter
     private var timer: Timer?
     private var checking: Set<UUID> = []
+    /// 알림별 마지막 확인 시각 (앱을 다시 켜면 처음부터)
+    private var lastChecked: [UUID: Date] = [:]
     private static var seenFile: URL { AppPaths.dataDir.appendingPathComponent("trigger-seen.json") }
 
     init(model: AppModel, notifier: Notifier, reminders: ReminderCenter) {
@@ -19,14 +21,17 @@ final class TriggerWatcher {
     }
 
     func start() {
-        timer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-            Task { @MainActor in await self?.checkAll() }
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.checkDue() }
         }
-        Task { try? await Task.sleep(nanoseconds: 10_000_000_000); await checkAll() }
+        Task { try? await Task.sleep(nanoseconds: 10_000_000_000); await checkDue() }
     }
 
-    func checkAll() async {
-        for alarm in model.alarms where alarm.enabled && alarm.trigger != nil {
+    /// 주기가 된 트리거만 확인한다.
+    func checkDue() async {
+        let now = Date()
+        for alarm in model.alarms where alarm.enabled {
+            guard let trigger = alarm.trigger, trigger.isDue(lastChecked: lastChecked[alarm.id], now: now) else { continue }
             await check(alarm)
         }
     }
@@ -36,6 +41,7 @@ final class TriggerWatcher {
     func check(_ alarm: Alarm) async -> (message: String, failed: Bool) {
         guard let trigger = alarm.trigger, !checking.contains(alarm.id) else { return ("이미 확인 중이에요", false) }
         checking.insert(alarm.id)
+        lastChecked[alarm.id] = Date()
         defer { checking.remove(alarm.id) }
         guard let items = try? await KimbiseoCLI.events(trigger.event, settings: model.settings) else {
             return ("확인하지 못했어요. 연결 메뉴를 확인해 주세요", true)

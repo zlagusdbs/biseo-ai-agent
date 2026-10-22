@@ -4,10 +4,25 @@ import Foundation
 public struct Trigger: Codable, Equatable, Hashable {
     public var system: String   // github, deploy, jira
     public var event: String    // 예: github.my_pr_approved
+    /// 몇 분마다 확인할지. nil 이면 5분 (예전 알림 파일 호환)
+    public var intervalMinutes: Int?
 
-    public init(system: String, event: String) {
+    public static let defaultInterval = 5
+    /// 고를 수 있는 주기 (분)
+    public static let intervals = [1, 3, 5, 10, 30, 60]
+
+    public var interval: Int { max(1, intervalMinutes ?? Self.defaultInterval) }
+
+    public init(system: String, event: String, intervalMinutes: Int? = nil) {
         self.system = system
         self.event = event
+        self.intervalMinutes = intervalMinutes
+    }
+
+    /// 지금 확인할 때인지. 한 번도 안 봤거나 마지막 확인에서 주기만큼 지났으면 true.
+    public func isDue(lastChecked: Date?, now: Date) -> Bool {
+        guard let lastChecked else { return true }
+        return now.timeIntervalSince(lastChecked) >= Double(interval * 60) - 5   // 타이머 오차 5초 허용
     }
 }
 
