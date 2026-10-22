@@ -3,7 +3,7 @@
 import httpx
 
 from .credentials import Credential
-from .errors import AuthExpired, NetworkUnreachable
+from .errors import AuthExpired, NetworkUnreachable, RequestRejected
 
 TIMEOUT_SECONDS = 10.0
 
@@ -30,3 +30,25 @@ class BasicClient:
             raise AuthExpired(self.system, f"HTTP {response.status_code}")
         response.raise_for_status()
         return response
+
+    def _post(self, path: str, body: dict) -> httpx.Response:
+        try:
+            response = self._client.post(path, json=body)
+        except httpx.TransportError as e:
+            raise NetworkUnreachable(self.system, str(e)) from e
+        if response.status_code in (401, 403):
+            raise AuthExpired(self.system, f"HTTP {response.status_code}")
+        if 400 <= response.status_code < 500:
+            raise RequestRejected(self.system, _reason(response))
+        response.raise_for_status()
+        return response
+
+
+def _reason(response: httpx.Response) -> str:
+    """Jira 식 오류 응답({errorMessages, errors})을 한 줄로."""
+    try:
+        data = response.json()
+    except ValueError:
+        return f"HTTP {response.status_code}"
+    parts = list(data.get("errorMessages") or []) + [f"{k}: {v}" for k, v in (data.get("errors") or {}).items()]
+    return "; ".join(parts) or f"HTTP {response.status_code}"

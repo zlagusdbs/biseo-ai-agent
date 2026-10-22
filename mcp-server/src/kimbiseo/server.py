@@ -1,4 +1,5 @@
-"""김비서 MCP 서버. Claude Code 가 stdio 로 띄워 도구를 호출한다. 모든 도구는 조회 전용이다."""
+"""김비서 MCP 서버. Claude Code 가 stdio 로 띄워 도구를 호출한다. 모든 도구는 조회 전용이다.
+(이슈 등록은 도구로 열지 않고, 사용자가 앱의 확인 카드에서 누를 때 `kimbiseo jira create` 로만 한다.)"""
 
 import datetime
 from collections.abc import Callable
@@ -56,6 +57,11 @@ def jira_search(jql: str, max_results: int = 50) -> dict:
     return _with_system("jira", work)
 
 
+def jira_projects(query: str = "") -> dict:
+    """사내 Jira 프로젝트 키와 이름. 사용자가 말한 프로젝트 이름(예: Pricing)의 키를 찾을 때 쓴다."""
+    return _with_system("jira", lambda base_url, cred: {"projects": JiraClient(base_url, cred).projects(query)})
+
+
 def wiki_search(query: str, limit: int = 10) -> dict:
     """사내 Wiki(Confluence) 페이지를 검색어로 찾는다. 결과의 id 로 wiki_get_page 를 호출하면 본문을 읽을 수 있다."""
     def work(base_url: str, cred: Credential) -> dict:
@@ -109,7 +115,7 @@ def github_review_requests() -> dict:
     return _with_system("github", lambda base_url, cred: {"pullRequests": github_client.review_requests(base_url)})
 
 
-TOOLS = [jira_search, wiki_search, wiki_get_page, hr_holidays, hr_flexwork_week,
+TOOLS = [jira_search, jira_projects, wiki_search, wiki_get_page, hr_holidays, hr_flexwork_week,
          deploy_my_releases, deploy_approvals, deploy_domain_releases, deploy_release_search, github_review_requests]
 for _tool in TOOLS:
     mcp.tool()(_tool)

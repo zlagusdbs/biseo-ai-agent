@@ -2,6 +2,12 @@ import Foundation
 import KimBiseoCore
 
 // Xcode 없이 XCTest 를 쓸 수 없어서 만든 검증 프로그램. `swift run KimBiseoCoreChecks`
+// 안내 문구 미리 보기: KIMBISEO_PRINT=jira-hint (기본값 없음) / jira-hint-defaults:<프로젝트키>
+if let what = ProcessInfo.processInfo.environment["KIMBISEO_PRINT"] {
+    let defaults = what.hasPrefix("jira-hint-defaults:") ? JiraDefaults(project: String(what.dropFirst(19))) : nil
+    print(JiraProposal.hint(defaults: defaults, now: Date(), calendar: .current))
+    exit(0)
+}
 var failures = 0
 var passed = 0
 
@@ -206,6 +212,33 @@ do {
     check(split.groups[1].summary.contains("끌어다"), "group: 빈 그룹 안내")
     let old = #"[{"id":"6F1D6F5E-0000-0000-0000-000000000003","title":"t","prompt":"p","hour":9,"minute":0,"repeatRule":{"daily":{}},"enabled":true}]"#
     check((try? JSONDecoder().decode([Alarm].self, from: Data(old.utf8)))?.first?.group == nil, "group: 예전 알림 파일은 그룹 없음")
+}
+
+// MARK: JiraProposal
+do {
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "Asia/Seoul")!
+    let now = cal.date(from: DateComponents(year: 2026, month: 10, day: 22, hour: 14))!
+    let d = JiraDefaults(project: "PRICING")
+    check(d.startDate(now: now, calendar: cal) == "2026-10-22" && d.endDate(now: now, calendar: cal) == "2026-12-31", "jira: 오늘·올해 마지막 날")
+    check(JiraDefaults(project: "P", targetStart: .none, targetEnd: .none).endDate(now: now, calendar: cal).isEmpty, "jira: 날짜 없음 규칙")
+    check(JiraProposal.looksLikeRequest("지라 등록해줘: 쿠폰 API 정리") && JiraProposal.looksLikeRequest("Jira 이슈 하나 만들어줘")
+          && !JiraProposal.looksLikeRequest("내 미완료 Jira 알려줘") && !JiraProposal.looksLikeRequest("매일 9시 알림 등록"), "jira: 등록 요청 판단")
+    let reply = "초안이에요.\n```kimbiseo-jira\n{\"issue\":{\"project\":\"PRICING\",\"issueType\":\"Story\",\"summary\":\" 쿠폰 정리 \",\"description\":\"h3. 배경\",\"targetEnd\":\"2026-12-31\"},\"defaults\":{\"project\":\"PRICING\",\"targetStart\":\"today\"}}\n```"
+    let (text, draft, defaults) = JiraProposal.extract(from: reply)
+    check(text == "초안이에요." && draft?.summary == "쿠폰 정리" && draft?.originalEstimate == "" && draft?.targetEnd == "2026-12-31", "jira: 초안 읽기 (빠진 항목은 빈칸)")
+    check(defaults == JiraDefaults(project: "PRICING"), "jira: 기본값 일부만 와도 나머지는 기본 규칙")
+    check(JiraProposal.extract(from: "```kimbiseo-jira\n{\"issue\":{\"project\":\"P\"}}\n```").draft == nil, "jira: 제목·유형 없는 초안은 버림")
+    let hintWith = JiraProposal.hint(defaults: d, now: now, calendar: cal)
+    let hintFirst = JiraProposal.hint(defaults: nil, now: now, calendar: cal)
+    check(hintWith.contains("프로젝트 PRICING") && hintWith.contains("2026-12-31") && !hintWith.contains("아직 없다"), "jira: 기본값 안내")
+    check(hintFirst.contains("아직 없다") && hintFirst.contains("jira_projects"), "jira: 처음엔 물어보기")
+    // 안내 속 예시 블록이 실제로 읽히는지 (Claude 가 그대로 따라 써도 카드가 뜸)
+    check(JiraProposal.extract(from: hintWith).draft?.project == "PRICING", "jira: 안내 예시 형식이 읽힘")
+    check(JiraProposal.extract(from: hintFirst).defaults?.targetEnd == .yearEnd, "jira: 처음 안내 예시의 기본값이 읽힘")
+    var m = ChatMessage(role: .assistant, text: "t", jira: draft, jiraDefaults: defaults)
+    m.jiraCreated = JiraCreated(key: "PRICING-1", url: "u")
+    let back = (try? JSONEncoder().encode(m)).flatMap { try? JSONDecoder().decode(ChatMessage.self, from: $0) }
+    check(back?.jira == draft && back?.jiraCreated?.key == "PRICING-1", "jira: 대화 기록에 초안·결과 저장")
 }
 
 // MARK: AppSettings

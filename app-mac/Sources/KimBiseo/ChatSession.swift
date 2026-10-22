@@ -27,9 +27,11 @@ final class ChatSession: ObservableObject {
     private let runner = ClaudeRunner()
     private let login = ClaudeLogin()
     private let settings: () -> AppSettings
+    private let jiraDefaults: () -> JiraDefaults?
 
-    init(settings: @escaping () -> AppSettings) {
+    init(settings: @escaping () -> AppSettings, jiraDefaults: @escaping () -> JiraDefaults? = { nil }) {
         self.settings = settings
+        self.jiraDefaults = jiraDefaults
         if let data = try? Data(contentsOf: AppPaths.chatFile),
            let stored = try? JSONDecoder().decode(Stored.self, from: data) {
             messages = stored.messages
@@ -42,7 +44,11 @@ final class ChatSession: ObservableObject {
         guard !trimmed.isEmpty || !images.isEmpty else { return }
         if trimmed.isEmpty { trimmed = "이 이미지를 보고 설명해줘." }
         append(ChatMessage(role: .user, text: text.trimmingCharacters(in: .whitespacesAndNewlines), images: images.map(\.path)))
-        if AlarmProposal.looksLikeRequest(trimmed) { trimmed += AlarmProposal.hint }
+        if JiraProposal.looksLikeRequest(trimmed) {
+            trimmed += JiraProposal.hint(defaults: jiraDefaults(), now: Date(), calendar: .current)
+        } else if AlarmProposal.looksLikeRequest(trimmed) {
+            trimmed += AlarmProposal.hint
+        }
         queue.append(.chat(trimmed, images))
         processNext()
     }
@@ -97,8 +103,9 @@ final class ChatSession: ObservableObject {
         switch response {
         case .success(let text, let newSession):
             if !newSession.isEmpty { sessionId = newSession }
-            let (clean, alarms) = AlarmProposal.extract(from: text)
-            append(ChatMessage(role: .assistant, text: clean, alarms: alarms))
+            let (afterAlarms, alarms) = AlarmProposal.extract(from: text)
+            let (clean, jira, defaults) = JiraProposal.extract(from: afterAlarms)
+            append(ChatMessage(role: .assistant, text: clean, alarms: alarms, jira: jira, jiraDefaults: defaults))
         case .failure(let failure):
             append(ChatMessage(role: .error, text: failure.message))
             lastFailedImages = images
@@ -146,6 +153,13 @@ final class ChatSession: ObservableObject {
     func cancelLogin() {
         login.cancel()
         loginState = .idle
+    }
+
+    /// 카드에서 초안을 고치거나 등록했을 때 그 메시지를 바꿔 저장한다.
+    func update(_ id: UUID, _ change: (inout ChatMessage) -> Void) {
+        guard let i = messages.firstIndex(where: { $0.id == id }) else { return }
+        change(&messages[i])
+        save()
     }
 
     private func append(_ message: ChatMessage) {

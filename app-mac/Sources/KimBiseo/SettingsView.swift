@@ -10,6 +10,7 @@ struct SettingsView: View {
             Section("단축키") {
                 HotkeyRecorder(hotkey: $model.settings.hotkey)
             }
+            JiraDefaultsSection(defaults: $model.jiraDefaults)
             Section("경로") {
                 TextField("김비서 저장소", text: $model.settings.repoDir)
                 TextField("claude", text: $model.settings.claudePath)
@@ -79,5 +80,41 @@ private struct HotkeyRecorder: View {
         recording = false
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+    }
+}
+
+/// Jira 등록 기본값. 처음 김비서에게 등록을 시키면 물어보고 저장한다. 여기서 직접 고치거나 지울 수 있다.
+private struct JiraDefaultsSection: View {
+    @Binding var defaults: JiraDefaults?
+
+    var body: some View {
+        Section {
+            if let value = defaults {
+                let binding = Binding(get: { value }, set: { defaults = $0 })
+                TextField("프로젝트 키", text: binding.project)
+                TextField("개발 일 유형", text: binding.devType)
+                TextField("일반 업무 유형", text: binding.taskType)
+                TextField("Original Estimate", text: binding.originalEstimate)
+                Picker("Target start", selection: binding.targetStart) {
+                    Text("등록하는 날").tag(JiraDefaults.StartRule.today)
+                    Text("비움").tag(JiraDefaults.StartRule.none)
+                }
+                Picker("Target end", selection: binding.targetEnd) {
+                    Text("그해 12월 31일").tag(JiraDefaults.EndRule.yearEnd)
+                    Text("비움").tag(JiraDefaults.EndRule.none)
+                }
+                TextField("Epic Link", text: binding.epicLink, prompt: Text("비우면 안 넣음"))
+                Button("기본값 지우기", role: .destructive) { defaults = nil }
+                    .help("지우면 다음 등록 때 김비서가 다시 물어봐요")
+            } else {
+                Text("아직 없어요. 김비서에게 처음 Jira 등록을 시키면 물어보고 저장해요.")
+                    .foregroundStyle(.secondary)
+                Button("직접 정하기") { defaults = JiraDefaults(project: "") }
+            }
+        } header: {
+            Text("Jira 등록 기본값")
+        } footer: {
+            Text("이 Mac 에만 저장돼요. 담당자는 항상 연결된 Jira 계정 본인이에요.").font(.caption).foregroundStyle(.secondary)
+        }
     }
 }

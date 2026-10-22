@@ -4,6 +4,7 @@ import Foundation
 public enum ClaudeCommand {
     public static let allowedTools = [
         "mcp__kimbiseo__jira_search",
+        "mcp__kimbiseo__jira_projects",
         "mcp__kimbiseo__wiki_search",
         "mcp__kimbiseo__wiki_get_page",
         "mcp__kimbiseo__hr_holidays",

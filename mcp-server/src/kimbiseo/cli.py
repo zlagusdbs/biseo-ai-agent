@@ -4,6 +4,8 @@
   kimbiseo connect --group <그룹>   같은 계정으로 그룹 전체 연결
   kimbiseo status                  시스템별 연결 상태
   kimbiseo github review-requests  내가 리뷰어인 열린 PR (GitHub CLI 로그인 사용)
+  kimbiseo jira create             이슈 등록. 표준 입력: {"project","issueType","summary","description",
+                                   "originalEstimate","targetStart","targetEnd","epicLink"} (앱 확인 카드에서만 부름)
   kimbiseo serve                   MCP 서버 (stdio)
 """
 
@@ -20,7 +22,7 @@ from .errors import AuthExpired, KimbiseoError, NetworkUnreachable
 from .hr_client import HrClient
 from . import github_client
 from .connections import find_system
-from .jira_client import JiraClient
+from .jira_client import IssueDraft, JiraClient
 from .deploy_client import DeployClient
 from .wiki_client import WikiClient
 
@@ -83,6 +85,32 @@ def system_status(system: SystemDef, verifiers: dict[str, Verifier]) -> str:
     return "expired" if credentials.is_expired(system.id) else "connected"
 
 
+def jira_create(stdin: TextIO, stdout: TextIO, systems: list[SystemDef]) -> int:
+    def fail(code: str, detail: str = "") -> int:
+        print(json.dumps({"error": code, "detail": detail}, ensure_ascii=False), file=stdout)
+        return 1
+
+    try:
+        draft = IssueDraft.from_json(json.loads(stdin.read()))
+    except (ValueError, AttributeError) as e:
+        return fail("BAD_INPUT", str(e))
+    if not (draft.project and draft.issue_type and draft.summary):
+        return fail("BAD_INPUT", "프로젝트, 이슈 유형, 제목은 꼭 있어야 해요")
+    system = find_system("jira", systems)
+    cred = credentials.load("jira")
+    if system is None or not system.enabled or not system.base_url or cred is None:
+        return fail("NOT_CONNECTED:jira")
+    try:
+        issue = JiraClient(system.base_url, cred).create_issue(draft)
+    except AuthExpired as e:
+        credentials.mark_expired("jira")
+        return fail(e.code)
+    except KimbiseoError as e:
+        return fail(e.code, str(e).removeprefix(e.code).strip())
+    print(json.dumps({"key": issue.key, "url": issue.url}, ensure_ascii=False), file=stdout)
+    return 0
+
+
 def main(argv: list[str] | None = None, stdin: TextIO = sys.stdin, stdout: TextIO = sys.stdout,
          verifiers: dict[str, Verifier] | None = None) -> int:
     verifiers = VERIFIERS if verifiers is None else verifiers
@@ -96,6 +124,8 @@ def main(argv: list[str] | None = None, stdin: TextIO = sys.stdin, stdout: TextI
     events.add_argument("event", help="이벤트 id. --list 로 목록")
     github = sub.add_parser("github")
     github.add_argument("action", choices=["review-requests"])
+    jira = sub.add_parser("jira")
+    jira.add_argument("action", choices=["create"])
     sub.add_parser("serve")
     args = parser.parse_args(argv)
 
@@ -135,6 +165,9 @@ def main(argv: list[str] | None = None, stdin: TextIO = sys.stdin, stdout: TextI
             return 1
         print(json.dumps(rows, ensure_ascii=False), file=stdout)
         return 0
+
+    if args.command == "jira":
+        return jira_create(stdin, stdout, systems)
 
     if args.command == "status":
         out = [{"system": s.id, "name": s.name, "group": s.group, "auth": s.auth, "baseUrl": s.base_url,
