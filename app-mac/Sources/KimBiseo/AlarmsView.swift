@@ -174,10 +174,20 @@ extension AlarmsView {
                 Text(alarm.title.isEmpty ? "(제목 없음)" : alarm.title).font(.callout).lineLimit(1)
                     .foregroundStyle(alarm.enabled ? Color.primary : Color.secondary)
                 Spacer()
-                if model.alarmRuns[alarm.id] == .running {
-                    ProgressView().controlSize(.mini)
-                        .help(alarm.trigger == nil ? "실행 중이에요. 끝나면 알림 창에 결과가 떠요" : "새로 생긴 게 있는지 보고 있어요")
+                HStack(spacing: 10) {
+                    if model.alarmRuns[alarm.id] == .running {
+                        ProgressView().controlSize(.mini)
+                            .help(alarm.trigger == nil ? "실행 중이에요. 끝나면 알림 창에 결과가 떠요" : "새로 생긴 게 있는지 보고 있어요")
+                    } else {
+                        Button { model.runAlarmNow(alarm) } label: { Image(systemName: "play.fill") }
+                            .help(alarm.trigger == nil ? "지금 실행" : "지금 확인")
+                    }
+                    Button { editing = alarm } label: { Image(systemName: "pencil") }.help("수정")
+                    Button(role: .destructive) { deletingAlarm = alarm } label: { Image(systemName: "trash") }
+                        .foregroundStyle(.red).help("삭제")
                 }
+                .buttonStyle(.borderless)
+                .font(.caption)
                 Button {
                     if open { openRows.remove(alarm.id) } else { openRows.insert(alarm.id) }
                 } label: {
@@ -204,7 +214,7 @@ extension AlarmsView {
         }
     }
 
-    /// 펼쳤을 때 보이는 상세: 언제, 무엇을, 받을 곳, 마지막 실행, 버튼.
+    /// 펼쳤을 때 보이는 상세: 언제, 무엇을, 받을 곳, 마지막 실행. (실행·수정·삭제 버튼은 제목 줄에 있다)
     private func details(_ alarm: Alarm) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             if let trigger = alarm.trigger {
@@ -226,17 +236,6 @@ extension AlarmsView {
                 }
             }
             .font(.caption2)
-            HStack(spacing: 14) {
-                Button { model.runAlarmNow(alarm) } label: {
-                    Label(alarm.trigger == nil ? "지금 실행" : "지금 확인", systemImage: "play.fill")
-                }
-                .disabled(model.alarmRuns[alarm.id] == .running)
-                Button { editing = alarm } label: { Label("수정", systemImage: "pencil") }
-                Button(role: .destructive) { deletingAlarm = alarm } label: { Label("삭제", systemImage: "trash") }
-                    .foregroundStyle(.red)
-            }
-            .buttonStyle(.borderless)
-            .padding(.top, 2)
         }
         .font(.caption)
     }
